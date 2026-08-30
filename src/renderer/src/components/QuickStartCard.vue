@@ -1,0 +1,174 @@
+<script setup lang="ts">
+import { reactive, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { usePatientStore } from '@/stores/patient'
+import type { Patient } from '@/api/types'
+
+const router = useRouter()
+const patientStore = usePatientStore()
+const loading = ref(false)
+
+const firstForm = reactive({
+  name: '',
+  phone: '',
+  gender: '女',
+  age: '',
+  address: '',
+  chiefComplaint: ''
+})
+
+const searchKw = ref('')
+const searchLoading = ref(false)
+
+async function onFirstVisit(): Promise<void> {
+  if (!firstForm.name.trim()) {
+    window.alert('请输入患者姓名')
+    return
+  }
+  loading.value = true
+  try {
+    await patientStore.firstVisit({
+      name: firstForm.name.trim(),
+      phone: firstForm.phone.trim() || undefined,
+      gender: firstForm.gender,
+      age: firstForm.age ? Number(firstForm.age) : undefined,
+      address: firstForm.address.trim() || undefined,
+      chiefComplaint: firstForm.chiefComplaint.trim() || undefined
+    })
+    router.push('/p360')
+  } catch (e) {
+    window.alert((e as Error).message)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function onSearch(): Promise<void> {
+  if (!searchKw.value.trim()) return
+  searchLoading.value = true
+  try {
+    await patientStore.search(searchKw.value.trim())
+  } catch (e) {
+    window.alert((e as Error).message)
+  } finally {
+    searchLoading.value = false
+  }
+}
+
+async function onFollowup(p: Patient): Promise<void> {
+  loading.value = true
+  try {
+    await patientStore.followup(p)
+    router.push('/p360')
+  } catch (e) {
+    window.alert((e as Error).message)
+  } finally {
+    loading.value = false
+  }
+}
+</script>
+
+<template>
+  <div class="qs-grid">
+    <!-- 左：新建首诊 -->
+    <div>
+      <div class="qs-title">🆕 新建首诊</div>
+      <div class="qs-desc">首次就诊患者，医师直接创建档案与首诊病历</div>
+      <div class="qs-form">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
+          <input v-model="firstForm.name" class="inp" placeholder="患者姓名" />
+          <input v-model="firstForm.phone" class="inp" placeholder="手机号" />
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
+          <select v-model="firstForm.gender" class="inp">
+            <option>性别：女</option>
+            <option>性别：男</option>
+          </select>
+          <input v-model="firstForm.age" class="inp" placeholder="年龄" />
+        </div>
+        <input v-model="firstForm.address" class="inp" placeholder="住址（常住地址）" />
+        <textarea v-model="firstForm.chiefComplaint" class="inp" placeholder="主诉（一句话）"></textarea>
+        <button class="btn btn-primary" :disabled="loading" @click="onFirstVisit">创建档案并接诊 →</button>
+      </div>
+    </div>
+    <!-- 右：复诊调档 -->
+    <div style="border-left: 1px dashed var(--border-strong); padding-left: 20px">
+      <div class="qs-title">🔁 复诊调档</div>
+      <div class="qs-desc">已就诊过的患者，姓名 + 手机号调档，直接续方</div>
+      <div style="display: flex; gap: 8px; margin-bottom: 10px">
+        <input
+          v-model="searchKw"
+          class="inp"
+          placeholder="🔍 姓名 + 手机号，如：张丽华 138****2671"
+          @keydown.enter="onSearch"
+        />
+        <button class="btn btn-ghost" :disabled="searchLoading" @click="onSearch">搜索</button>
+      </div>
+      <div v-for="p in patientStore.searchResults" :key="p._id" class="qs-result">
+        <div class="ava">{{ p.name[0] }}</div>
+        <div style="flex: 1; min-width: 0">
+          <b style="font-size: 13.5px">{{ p.name }}</b>
+          <span style="color: var(--text-mute); font-size: 11.5px">
+            {{ p.gender ?? '未知' }} · {{ p.phone ?? '' }}
+          </span>
+          <div style="font-size: 11.5px; color: var(--text-mute); margin-top: 2px">
+            档案号 {{ p.medicalRecordNo ?? p.empiId }}
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" @click="onFollowup(p)">调档接诊</button>
+      </div>
+      <div v-if="patientStore.searchResults.length === 0" style="font-size: 11.5px; color: var(--text-mute)">
+        💡 调档后自动带入上次诊断与历史处方，一键复制续方
+      </div>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.qs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.qs-title {
+  font-size: 14px;
+  font-weight: 700;
+}
+.qs-desc {
+  font-size: 12px;
+  color: var(--text-mute);
+  margin: 3px 0 12px;
+}
+.qs-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.qs-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  transition: 0.15s;
+  cursor: pointer;
+}
+.qs-result:hover {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+.ava {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--grad);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+</style>

@@ -1,0 +1,39 @@
+/* 动效：克制使用，仅页面切换、fadeUp、pulse 三处（医疗场景不加装饰性动画） */
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.fade-up-enter-active {
+  animation: fadeUp 0.3s ease;
+}
+.fade-up-leave-active {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(43, 164, 113, 0.5);
+  }
+  70% {
+    box-shadow: 0 0 0 9px rgba(43, 164, 113, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(43, 164, 113, 0);
+  }
+}
+
+.pulse {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: pulse 1.6s infinite;
+}

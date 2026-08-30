@@ -182,6 +182,7 @@ void patientStore.search('')
 .search-btn {
   flex-shrink: 0;
   white-space: nowrap;
+  cursor: pointer !important;
 }
 .ava {
   width: 38px;

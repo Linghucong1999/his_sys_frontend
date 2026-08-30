@@ -1,10 +1,12 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
 // 通过 contextBridge 暴露给渲染进程的 API。
-// 后续打印（webContents.print）、读卡器等桌面能力在这里扩展。
+// 打印（处方/病历）：渲染进程生成打印 HTML，主进程隐藏窗口渲染并调系统打印
 const api = {
-  platform: process.platform
+  platform: process.platform,
+  printHtml: (html: string, options?: { silent?: boolean }): Promise<{ ok: boolean; reason?: string | null }> =>
+    ipcRenderer.invoke('print:html', { html, silent: options?.silent ?? false })
 }
 
 if (process.contextIsolated) {

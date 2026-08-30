@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow } from 'electron'
+import { app, shell, BrowserWindow, ipcMain } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 
@@ -36,6 +36,45 @@ function createWindow(): void {
   }
 }
 
+/** 打印窗口：隐藏渲染打印 HTML，调系统打印对话框（A4 比例） */
+let printWindow: BrowserWindow | null = null
+
+function getPrintWindow(): BrowserWindow {
+  if (!printWindow || printWindow.isDestroyed()) {
+    printWindow = new BrowserWindow({
+      width: 794,
+      height: 1123,
+      show: false,
+      webPreferences: { sandbox: false, contextIsolation: true }
+    })
+    printWindow.on('closed', () => {
+      printWindow = null
+    })
+  }
+  return printWindow
+}
+
+function registerPrintHandler(): void {
+  ipcMain.handle('print:html', async (_event, payload: { html: string; silent?: boolean }) => {
+    if (!payload || typeof payload.html !== 'string' || payload.html.length === 0) {
+      throw new Error('打印内容无效')
+    }
+    const win = getPrintWindow()
+    await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(payload.html))
+    return new Promise((resolve) => {
+      win.webContents.print(
+        { silent: payload.silent ?? false, printBackground: true },
+        (success, failureReason) => {
+          if (!success && failureReason) {
+            console.warn('打印失败:', failureReason)
+          }
+          resolve({ ok: success, reason: failureReason ?? null })
+        }
+      )
+    })
+  })
+}
+
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.his.workstation')
 
@@ -43,6 +82,7 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
+  registerPrintHandler()
   createWindow()
 
   app.on('activate', () => {

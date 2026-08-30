@@ -89,9 +89,3 @@ export function buildRecordPrintHtml(record: MedicalRecord, patient?: Patient | 
 </body>
 </html>`
 }
-
-/** 调系统打印（弹打印机选择对话框；silent=true 时直接打默认打印机） */
-export async function printRecord(record: MedicalRecord, patient?: Patient | null, silent = false): Promise<void> {
-  const html = buildRecordPrintHtml(record, patient)
-  await window.api.printHtml(html, { silent })
-}

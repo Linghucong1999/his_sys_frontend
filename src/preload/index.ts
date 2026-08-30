@@ -5,8 +5,15 @@ import { electronAPI } from '@electron-toolkit/preload'
 // 打印（处方/病历）：渲染进程生成打印 HTML，主进程隐藏窗口渲染并调系统打印
 const api = {
   platform: process.platform,
-  printHtml: (html: string, options?: { silent?: boolean }): Promise<{ ok: boolean; reason?: string | null }> =>
-    ipcRenderer.invoke('print:html', { html, silent: options?.silent ?? false })
+  printHtml: (
+    html: string,
+    options?: { silent?: boolean; copies?: number }
+  ): Promise<{ ok: boolean; reason?: string | null }> =>
+    ipcRenderer.invoke('print:html', {
+      html,
+      silent: options?.silent ?? false,
+      copies: options?.copies ?? 1
+    })
 }
 
 if (process.contextIsolated) {

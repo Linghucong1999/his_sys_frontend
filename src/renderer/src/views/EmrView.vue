@@ -3,7 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { listRecords, signRecord } from '@/api/emr'
 import { fetchPatient } from '@/api/patients'
-import { printRecord } from '@/utils/print'
+import { buildRecordPrintHtml } from '@/utils/print'
+import PrintPreviewDialog from '@/components/PrintPreviewDialog.vue'
 import type { MedicalRecord } from '@/api/types'
 
 const router = useRouter()
@@ -64,13 +65,20 @@ async function onSign(): Promise<void> {
   }
 }
 
-/** 🖨 打印选中病历（联查患者性别/年龄） */
+/** 🖨 打印选中病历：打开打印预览对话框（联查患者性别/年龄） */
+const previewVisible = ref(false)
+const previewHtml = ref('')
+const previewTitle = ref('')
+
 async function onPrint(): Promise<void> {
   if (!selected.value) return
   busy.value = true
   try {
     const patient = await fetchPatient(selected.value.patientId)
-    await printRecord(selected.value, patient)
+    previewHtml.value = buildRecordPrintHtml(selected.value, patient)
+    const kind = selected.value.type === 'prescription' ? '处方' : selected.value.type === 'admission' ? '入院记录' : '门诊病历'
+    previewTitle.value = `${kind} · ${selected.value.patientName}`
+    previewVisible.value = true
   } catch (e) {
     window.alert((e as Error).message)
   } finally {
@@ -173,6 +181,7 @@ onMounted(() => {
       </div>
     </div>
   </section>
+  <PrintPreviewDialog v-model:visible="previewVisible" :title="previewTitle" :print-html="previewHtml" />
 </template>
 
 <style scoped>

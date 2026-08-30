@@ -10,6 +10,7 @@ import EmrBlock from '@/components/EmrBlock.vue'
 import AiCopilotPanel from '@/components/AiCopilotPanel.vue'
 import type { DiagnosisItem, MedicalRecord } from '@/api/types'
 import { buildRecordPrintHtml } from '@/utils/print'
+import PrintPreviewDialog from '@/components/PrintPreviewDialog.vue'
 
 const router = useRouter()
 const patientStore = usePatientStore()
@@ -134,8 +135,12 @@ async function onSign(): Promise<void> {
   }
 }
 
-/** 打印当前病历（用编辑区内容即时生成打印稿） */
-async function onPrint(): Promise<void> {
+/** 打印当前病历：打开打印预览对话框（预览确认后打印） */
+const previewVisible = ref(false)
+const previewHtml = ref('')
+const previewTitle = ref('')
+
+function onPrint(): void {
   if (!patient.value) return
   const draft: MedicalRecord = {
     _id: currentRecord.value?._id ?? 'draft',
@@ -155,11 +160,9 @@ async function onPrint(): Promise<void> {
     signedBy: currentRecord.value?.signedBy,
     signedAt: currentRecord.value?.signedAt
   }
-  try {
-    await window.api.printHtml(buildRecordPrintHtml(draft, patient.value))
-  } catch (e) {
-    errorMsg.value = (e as Error).message
-  }
+  previewHtml.value = buildRecordPrintHtml(draft, patient.value)
+  previewTitle.value = `门诊病历 · ${patient.value.name}`
+  previewVisible.value = true
 }
 
 onMounted(() => {
@@ -275,6 +278,7 @@ watch(() => patientStore.current, () => void loadRecord())
       </div>
     </div>
   </section>
+  <PrintPreviewDialog v-model:visible="previewVisible" :title="previewTitle" :print-html="previewHtml" />
 </template>
 
 <style scoped>

@@ -55,24 +55,36 @@ function getPrintWindow(): BrowserWindow {
 }
 
 function registerPrintHandler(): void {
-  ipcMain.handle('print:html', async (_event, payload: { html: string; silent?: boolean }) => {
-    if (!payload || typeof payload.html !== 'string' || payload.html.length === 0) {
-      throw new Error('打印内容无效')
-    }
-    const win = getPrintWindow()
-    await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(payload.html))
-    return new Promise((resolve) => {
-      win.webContents.print(
-        { silent: payload.silent ?? false, printBackground: true },
-        (success, failureReason) => {
-          if (!success && failureReason) {
-            console.warn('打印失败:', failureReason)
+  ipcMain.handle(
+    'print:html',
+    async (_event, payload: { html: string; silent?: boolean; copies?: number }) => {
+      if (!payload || typeof payload.html !== 'string' || payload.html.length === 0) {
+        throw new Error('打印内容无效')
+      }
+      const win = getPrintWindow()
+      // 非静默打印（系统打印对话框）时需显示窗口，否则 Windows 下对话框不可见
+      if (!payload.silent) win.show()
+      await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(payload.html))
+      return new Promise((resolve) => {
+        win.webContents.print(
+          {
+            silent: payload.silent ?? false,
+            printBackground: true,
+            copies: Math.max(1, payload.copies ?? 1)
+          },
+          (success, failureReason) => {
+            if (!success && failureReason) {
+              console.warn('打印失败:', failureReason)
+            }
+            if (!payload.silent) {
+              win.hide()
+            }
+            resolve({ ok: success, reason: failureReason ?? null })
           }
-          resolve({ ok: success, reason: failureReason ?? null })
-        }
-      )
-    })
-  })
+        )
+      })
+    }
+  )
 }
 
 app.whenReady().then(() => {

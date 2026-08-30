@@ -50,10 +50,23 @@
 | 智能工作台 | 问候+统计卡+快速开始（新建首诊/复诊调档）+待办聚合+快捷入口 | `GET /api/dashboard/*`、`POST /api/patients`、`POST /api/outpatient/visits` |
 | 患者 360° | 患者卡+就诊旅程、区块化病历编辑（ICD-10 智能匹配）、CA 签名、AI 辅助面板 | `GET/POST /api/emr/records`、`GET /api/dictionaries/icd10` |
 | 住院工作站 | 病区筛选、床位卡片网格、长期/临时医嘱、停嘱 | `GET /api/inpatient/*` |
-| 电子病历 | 病历/处方列表（筛选）、预览、CA 签名 | `GET /api/emr/records` |
+| 电子病历 | 病历/处方列表（筛选）、预览、CA 签名、打印 | `GET /api/emr/records` |
 | 会诊管理 | 会诊列表（待响应/进行中）、发起会诊、响应、催办 | `GET/POST /api/consultations` |
 | Cmd+K | 患者调档/病历/药品/命令聚合搜索 | `GET /api/search?q=` |
 | 深色模式 | 底部导航一键切换，localStorage 持久化 | — |
+
+## 界面预览
+
+截图存储于 `docs/screenshots/`（截图方式见 `docs/screenshots-guide.md`）。
+
+| 视图 | 截图 |
+|---|---|
+| 登录 | ![登录](docs/screenshots/login.png) |
+| 智能工作台 | ![智能工作台](docs/screenshots/workbench.png) |
+| 患者 360° 工作站 | ![患者 360°](docs/screenshots/p360.png) |
+| 住院工作站 | ![住院工作站](docs/screenshots/inpatient.png) |
+| 电子病历 EMR | ![电子病历 EMR](docs/screenshots/emr.png) |
+| 会诊管理 | ![会诊管理](docs/screenshots/consultations.png) |
 
 ## 快速开始
 

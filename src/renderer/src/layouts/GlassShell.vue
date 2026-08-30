@@ -12,7 +12,8 @@ const route = useRoute()
     <TopBar />
     <main class="shell-main">
       <RouterView v-slot="{ Component }">
-        <Transition name="fade-up" mode="out-in">
+        <!-- 不做 out-in：异步视图加载时避免出现空白窗口期 -->
+        <Transition name="fade-up" appear>
           <component :is="Component" :key="route.path" />
         </Transition>
       </RouterView>

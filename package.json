@@ -1,0 +1,38 @@
+{
+  "name": "his-frontend",
+  "version": "0.1.0",
+  "description": "HIS 医生工作站桌面端（Electron + Vue3 + Element Plus）",
+  "private": true,
+  "main": "./out/main/index.js",
+  "author": "",
+  "license": "UNLICENSED",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "start": "electron-vite preview",
+    "build": "electron-vite build",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
+    "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json --composite false",
+    "typecheck": "yarn typecheck:node && yarn typecheck:web",
+    "build:win": "electron-vite build && electron-builder --win",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "dependencies": {
+    "@electron-toolkit/preload": "^3.0.0",
+    "@electron-toolkit/utils": "^3.0.0",
+    "@element-plus/icons-vue": "^2.3.1",
+    "axios": "^1.7.2",
+    "element-plus": "^2.7.6",
+    "pinia": "^2.1.7",
+    "vue": "^3.4.27",
+    "vue-router": "^4.3.2"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.4",
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3",
+    "electron-vite": "^2.3.0",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.11",
+    "vue-tsc": "^2.0.19"
+  }
+}

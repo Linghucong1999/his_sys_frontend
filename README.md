@@ -8,11 +8,12 @@
 |---|---|
 | 桌面外壳 | Electron + electron-vite |
 | 框架 | Vue 3（TypeScript，组合式 API） |
-| UI 组件库 | Element Plus（中文 locale） |
+| UI 体系 | **UI 稿直译的自研视觉组件**（双主题 CSS 变量 + 玻璃拟态，无第三方组件库依赖） |
+| 工具库 | VueUse（useDark 深色模式，@vueuse/core） |
 | 状态管理 | Pinia |
 | 路由 | Vue Router 4（hash 模式，适配桌面端本地文件加载） |
-| HTTP | axios（统一拦截器：token 注入 + 响应解包） |
-| 包管理 | yarn |
+| HTTP | axios（统一拦截器：token 注入 + {code,data,message} 解包） |
+| 包管理 | yarn（全部依赖仅安装在本项目内，不使用全局环境） |
 | 打包 | electron-builder（Windows 安装包） |
 
 ## 目录结构
@@ -27,13 +28,32 @@
 │   └── renderer/               # Vue3 渲染进程
 │       ├── index.html
 │       └── src/
-│           ├── main.ts         # 应用入口：Element Plus + Pinia + Router + 图标全局注册
+│           ├── main.ts         # 应用入口：Pinia + Router
 │           ├── App.vue
-│           ├── api/request.ts  # axios 封装（baseURL、token 注入、{code,data,message} 解包）
-│           ├── router/         # 路由（hash 模式、登录守卫占位）
-│           ├── assets/         # 全局样式
-│           └── views/          # 页面（LoginView 登录页、HomeView 工作台占位）
+│           ├── styles/
+│           │   ├── tokens.css  # 双主题 CSS 变量（与 UI 稿一致）+ 通用卡片/按钮/输入控件
+│           │   └── motion.css  # 动效（fadeUp/pulse）
+│           ├── api/            # axios 封装 + 各域接口（auth/dashboard/emr/consultations/inpatient/…）
+│           ├── stores/         # user（登录态）/ patient（建档调档）/ todo（统计待办）
+│           ├── router/         # 嵌套路由（GlassShell 下 5 个视图）+ 登录守卫
+│           ├── layouts/GlassShell.vue        # 玻璃拟态外壳（导航+顶栏+视图区）
+│           ├── components/     # IconNav/TopBar/CommandPalette/StatCard/Sparkline/
+│           │                   # PatientJourney/EmrBlock/AiCopilotPanel/QuickStartCard
+│           └── views/          # LoginView/WorkbenchView/P360View/InpatientView/EmrView/ConsultationView
 ```
+
+## 功能视图（第一版）
+
+| 视图 | 功能 | 后端接口 |
+|---|---|---|
+| 登录 | 工号+密码登录，RBAC 角色展示 | `POST /api/auth/login` |
+| 智能工作台 | 问候+统计卡+快速开始（新建首诊/复诊调档）+待办聚合+快捷入口 | `GET /api/dashboard/*`、`POST /api/patients`、`POST /api/outpatient/visits` |
+| 患者 360° | 患者卡+就诊旅程、区块化病历编辑（ICD-10 智能匹配）、CA 签名、AI 辅助面板 | `GET/POST /api/emr/records`、`GET /api/dictionaries/icd10` |
+| 住院工作站 | 病区筛选、床位卡片网格、长期/临时医嘱、停嘱 | `GET /api/inpatient/*` |
+| 电子病历 | 病历/处方列表（筛选）、预览、CA 签名 | `GET /api/emr/records` |
+| 会诊管理 | 会诊列表（待响应/进行中）、发起会诊、响应、催办 | `GET/POST /api/consultations` |
+| Cmd+K | 患者调档/病历/药品/命令聚合搜索 | `GET /api/search?q=` |
+| 深色模式 | 底部导航一键切换，localStorage 持久化 | — |
 
 ## 快速开始
 

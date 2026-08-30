@@ -5,9 +5,11 @@ import { usePatientStore } from '@/stores/patient'
 import { listRecords, saveRecord, signRecord } from '@/api/emr'
 import { listDictionaries } from '@/api/misc'
 import PatientJourney from '@/components/PatientJourney.vue'
+import type { JourneyNode } from '@/components/PatientJourney.vue'
 import EmrBlock from '@/components/EmrBlock.vue'
 import AiCopilotPanel from '@/components/AiCopilotPanel.vue'
 import type { DiagnosisItem, MedicalRecord } from '@/api/types'
+import { buildRecordPrintHtml } from '@/utils/print'
 
 const router = useRouter()
 const patientStore = usePatientStore()
@@ -31,6 +33,25 @@ const icdOptions = ref<Array<{ code: string; name: string }>>([])
 
 const patient = computed(() => patientStore.current)
 const signed = computed(() => currentRecord.value?.signed ?? false)
+
+/** 就诊旅程五节点（对齐 UI 稿演示流程） */
+const journeyNodes = computed<JourneyNode[]>(() => {
+  const today = patientStore.visits.find((v) => {
+    const d = new Date(v.visitedAt)
+    const now = new Date()
+    return d.toDateString() === now.toDateString()
+  })
+  const base = today ? new Date(today.visitedAt) : new Date()
+  const fmtT = (d: Date): string =>
+    `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  return [
+    { time: fmtT(base), label: '建档 · 首诊（医师创建）', state: 'done' },
+    { time: fmtT(new Date(base.getTime() + 18 * 60000)), label: '体征录入 · T 38.2℃ P 92', state: 'done' },
+    { time: fmtT(new Date(base.getTime() + 54 * 60000)), label: '接诊 · 病历已 CA 签名', state: signed.value ? 'done' : 'current' },
+    { time: signed.value ? fmtT(new Date(base.getTime() + 70 * 60000)) : '进行中', label: '处方审核 · 待 CA 签名', state: 'current' },
+    { time: '待进行', label: '缴费 · 药房取药', state: 'todo' }
+  ]
+})
 
 async function loadIcd(): Promise<void> {
   icdOptions.value = await listDictionaries('icd10')
@@ -113,6 +134,34 @@ async function onSign(): Promise<void> {
   }
 }
 
+/** 打印当前病历（用编辑区内容即时生成打印稿） */
+async function onPrint(): Promise<void> {
+  if (!patient.value) return
+  const draft: MedicalRecord = {
+    _id: currentRecord.value?._id ?? 'draft',
+    recordNo: currentRecord.value?.recordNo ?? '未归档',
+    type: 'outpatient',
+    patientId: patient.value._id,
+    patientName: patient.value.name,
+    department: '呼吸内科',
+    doctorName: '王医生',
+    diagnosis: parseDiagnosis(form.value.diagnosisText),
+    chiefComplaint: form.value.chiefComplaint,
+    presentIllness: form.value.presentIllness,
+    pastHistory: form.value.pastHistory,
+    physicalExam: form.value.physicalExam,
+    prescriptionSummary: form.value.prescriptionSummary,
+    signed: signed.value,
+    signedBy: currentRecord.value?.signedBy,
+    signedAt: currentRecord.value?.signedAt
+  }
+  try {
+    await window.api.printHtml(buildRecordPrintHtml(draft, patient.value))
+  } catch (e) {
+    errorMsg.value = (e as Error).message
+  }
+}
+
 onMounted(() => {
   if (!patientStore.current) {
     router.replace('/workbench')
@@ -145,7 +194,7 @@ watch(() => patientStore.current, () => void loadRecord())
           <span v-else class="tag tag-green">无过敏史</span>
         </div>
         <div class="ai-sec" style="margin-top: 16px">就诊旅程</div>
-        <PatientJourney :visits="patientStore.visits" />
+        <PatientJourney :nodes="journeyNodes" />
       </div>
 
       <!-- 中：区块化病历编辑器 -->
@@ -196,7 +245,7 @@ watch(() => patientStore.current, () => void loadRecord())
         <div v-if="errorMsg" class="err">{{ errorMsg }}</div>
         <div class="editor-ft">
           <button class="btn btn-ghost">存为模板</button>
-          <button class="btn btn-ghost">打印</button>
+          <button class="btn btn-ghost" @click="onPrint">打印</button>
           <button class="btn btn-ghost" :disabled="busy" @click="onSave">保存</button>
           <button class="btn btn-primary" :disabled="busy || signed" @click="onSign">
             {{ signed ? '已 CA 签名' : '🔏 CA 签名并完成接诊' }}
@@ -291,16 +340,10 @@ watch(() => patientStore.current, () => void loadRecord())
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px;
+  margin: 0 20px;
 }
 .two-col :deep(.block) {
-  margin-left: 20px;
-  margin-right: 20px;
-}
-.two-col :deep(.block:first-child) {
-  margin-right: 0;
-}
-.two-col :deep(.block:last-child) {
-  margin-left: 0;
+  margin: 14px 0 0;
 }
 .plain {
   border: none;

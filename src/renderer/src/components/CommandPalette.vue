@@ -102,6 +102,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
           </div>
           <small>{{ item.sub }}</small>
         </div>
+        <div v-if="results.length === 0" class="cmdk-empty">未找到匹配的患者 / 病历 / 药品</div>
       </div>
       <div class="cmdk-ft">
         <span>↑↓ 选择</span><span>↵ 执行</span><span>esc 关闭</span>
@@ -122,6 +123,7 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
   justify-content: center;
   padding-top: 16vh;
   z-index: 60;
+  cursor: pointer;
 }
 .cmdk-mask.open {
   animation: fadeUp 0.2s ease;
@@ -185,6 +187,12 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
   color: var(--text-mute);
   font-size: 11.5px;
   flex-shrink: 0;
+}
+.cmdk-empty {
+  padding: 28px;
+  text-align: center;
+  color: var(--text-mute);
+  font-size: 12.5px;
 }
 .cmdk-ft {
   padding: 9px 16px;

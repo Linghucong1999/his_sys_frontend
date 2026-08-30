@@ -3,8 +3,10 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { createConsultation, listConsultations, respondConsultation, urgeConsultation } from '@/api/consultations'
 import { searchPatients } from '@/api/patients'
 import { listDictionaries } from '@/api/misc'
+import { useUserStore } from '@/stores/user'
 import type { Consultation, Patient } from '@/api/types'
 
+const userStore = useUserStore()
 const items = ref<Consultation[]>([])
 const filter = ref<'all' | 'pending' | 'mine'>('all')
 const busy = ref(false)
@@ -26,6 +28,10 @@ const completed = computed(() => items.value.filter((c) => c.status === 'complet
 
 const filtered = computed(() => {
   if (filter.value === 'pending') return items.value.filter((c) => c.status === 'pending')
+  if (filter.value === 'mine') {
+    const dept = userStore.user?.department ?? '呼吸内科'
+    return items.value.filter((c) => c.fromDept === dept)
+  }
   return items.value
 })
 
@@ -155,14 +161,14 @@ onMounted(async () => {
         <div style="font-size: 14px; font-weight: 700; margin-bottom: 4px">＋ 发起会诊</div>
         <div style="font-size: 11.5px; color: var(--text-mute); margin-bottom: 13px">提交即 CA 签名，写入审计日志</div>
         <div class="qs-form">
-          <div style="display: flex; gap: 8px">
+          <div class="search-row">
             <input
               v-model="form.patientKw"
-              class="inp"
+              class="inp search-inp"
               placeholder="🔍 患者：姓名 + 手机号调档"
               @keydown.enter="onPatientSearch"
             />
-            <button class="btn btn-ghost btn-sm" @click="onPatientSearch">搜索</button>
+            <button class="btn btn-ghost btn-sm search-btn" @click="onPatientSearch">搜索</button>
           </div>
           <div v-for="p in patientHits" :key="p._id" class="qs-result" @click="selectedPatient = p; patientHits = []">
             <b style="font-size: 13px">{{ p.name }}</b>
@@ -255,5 +261,18 @@ onMounted(async () => {
   background: var(--green-bg);
   padding: 6px 10px;
   border-radius: 8px;
+}
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.search-inp {
+  flex: 1;
+  min-width: 0;
+}
+.search-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 </style>

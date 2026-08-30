@@ -1,18 +1,27 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { listRecords, signRecord } from '@/api/emr'
+import { fetchPatient } from '@/api/patients'
+import { printRecord } from '@/utils/print'
 import type { MedicalRecord } from '@/api/types'
 
+const router = useRouter()
+const route = useRoute()
 const records = ref<MedicalRecord[]>([])
 const selected = ref<MedicalRecord | null>(null)
 const keyword = ref('')
-const filter = ref<'all' | 'unsigned' | 'signed'>('all')
+const filter = ref<'all' | 'unsigned' | 'signed' | 'recent'>('all')
 const busy = ref(false)
 
 const filtered = computed(() => {
   let list = records.value
   if (filter.value === 'unsigned') list = list.filter((r) => !r.signed)
   if (filter.value === 'signed') list = list.filter((r) => r.signed)
+  if (filter.value === 'recent') {
+    const from = Date.now() - 30 * 86400000
+    list = list.filter((r) => (r.visitedAt ? new Date(r.visitedAt).getTime() >= from : true))
+  }
   return list
 })
 
@@ -25,6 +34,17 @@ function fmt(d: string | undefined): string {
   if (!d) return ''
   const date = new Date(d)
   return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function isToday(d: string | undefined): boolean {
+  if (!d) return false
+  const date = new Date(d)
+  const now = new Date()
+  return (
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate()
+  )
 }
 
 function fmtFull(d: string | undefined): string {
@@ -44,7 +64,26 @@ async function onSign(): Promise<void> {
   }
 }
 
+/** 🖨 打印选中病历（联查患者性别/年龄） */
+async function onPrint(): Promise<void> {
+  if (!selected.value) return
+  busy.value = true
+  try {
+    const patient = await fetchPatient(selected.value.patientId)
+    await printRecord(selected.value, patient)
+  } catch (e) {
+    window.alert((e as Error).message)
+  } finally {
+    busy.value = false
+  }
+}
+
 onMounted(() => {
+  // 支持 ?filter=unsigned（顶栏 CA 签名入口）预筛选
+  const f = route.query.filter
+  if (f === 'unsigned' || f === 'signed' || f === 'recent') {
+    filter.value = f
+  }
   void load()
 })
 </script>
@@ -63,6 +102,7 @@ onMounted(() => {
       <div class="chip" :class="{ active: filter === 'all' }" @click="filter = 'all'; load()">全部</div>
       <div class="chip" :class="{ active: filter === 'unsigned' }" @click="filter = 'unsigned'; load()">待签名</div>
       <div class="chip" :class="{ active: filter === 'signed' }" @click="filter = 'signed'; load()">已签名</div>
+      <div class="chip" :class="{ active: filter === 'recent' }" @click="filter = 'recent'; load()">近 30 天 ▾</div>
     </div>
     <div class="grid2">
       <!-- 病历列表 -->
@@ -74,7 +114,7 @@ onMounted(() => {
           :class="{ sel: selected?._id === r._id }"
           @click="selected = r"
         >
-          <div class="ed">{{ fmt(r.visitedAt) }}</div>
+          <div class="ed">{{ fmt(r.visitedAt) }}<br /><small>{{ isToday(r.visitedAt) ? '今日' : '' }}</small></div>
           <div class="tt" style="flex: 1; min-width: 0">
             <b style="font-size: 13px">{{ r.patientName }} · {{ r.diagnosis[0]?.name ?? '—' }}</b>
             <div style="font-size: 11.5px; color: var(--text-mute); margin-top: 1px">
@@ -125,10 +165,10 @@ onMounted(() => {
           <div class="bb">{{ selected.prescriptionSummary }}</div>
         </div>
         <div class="editor-ft">
-          <button class="btn btn-ghost">🖨 打印</button>
+          <button class="btn btn-ghost" :disabled="busy" @click="onPrint">🖨 打印</button>
           <button class="btn btn-ghost">复制为新病历模板</button>
           <button v-if="!selected.signed" class="btn btn-primary" :disabled="busy" @click="onSign">🔏 CA 签名</button>
-          <button v-else class="btn btn-ghost" disabled>已签名</button>
+          <button v-else class="btn btn-primary" @click="router.push('/p360')">🔁 复诊续方</button>
         </div>
       </div>
     </div>

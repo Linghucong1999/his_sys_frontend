@@ -42,6 +42,24 @@ const CATEGORY_CLASS: Record<string, string> = {
   exam: 'tag-orange'
 }
 
+function patientAge(birthDate?: string): string {
+  if (!birthDate) return ''
+  const age = Math.floor((Date.now() - new Date(birthDate).getTime()) / (365 * 86400000))
+  return age > 0 ? `${age}岁` : ''
+}
+
+function patientInfo(b: Bed): string {
+  const p = typeof b.patientId === 'object' ? b.patientId : null
+  if (!p) return ''
+  return `${p.name} · ${p.gender ?? ''} ${patientAge(p.birthDate)}`
+}
+
+function patientMeta(b: Bed): string {
+  const p = typeof b.patientId === 'object' ? b.patientId : null
+  if (!p) return ''
+  return `${p.gender ?? '未知'} · ${patientAge(p.birthDate) || '—'}`
+}
+
 onMounted(() => {
   void loadBeds()
 })
@@ -84,9 +102,9 @@ onMounted(() => {
           >
             <div class="bn">{{ b.bedNo }}</div>
             <div class="bp" :style="b.status === 'empty' ? 'color:var(--text-mute)' : ''">
-              {{ b.status === 'occupied' ? `${b.patientName} · ${b.note ? '' : ''}` : '空床' }}
+              {{ b.status === 'occupied' ? patientInfo(b) : '空床' }}
             </div>
-            <div class="bd">{{ b.status === 'occupied' ? b.note : b.note }}</div>
+            <div class="bd">{{ b.note }}</div>
           </div>
         </div>
       </div>
@@ -100,7 +118,7 @@ onMounted(() => {
             <span class="tag tag-red">一级护理</span>
           </div>
           <div style="font-size: 11.5px; color: var(--text-mute); margin-top: 4px">
-            住院号 {{ selectedBed.admissionNo ?? '—' }} · {{ selectedBed.note }}
+            {{ patientMeta(selectedBed) }} · 住院号 {{ selectedBed.admissionNo ?? '—' }} · {{ selectedBed.note }}
           </div>
         </div>
         <div v-else style="padding: 15px 18px; border-bottom: 1px solid var(--border)">

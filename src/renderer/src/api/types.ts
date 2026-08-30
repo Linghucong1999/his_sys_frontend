@@ -86,7 +86,7 @@ export interface Bed {
   bedNo: string
   ward: string
   status: 'occupied' | 'empty'
-  patientId?: string
+  patientId?: string | { _id: string; name: string; gender?: string; birthDate?: string }
   patientName?: string
   admissionNo?: string
   flag?: 'normal' | 'postop' | 'leaving'

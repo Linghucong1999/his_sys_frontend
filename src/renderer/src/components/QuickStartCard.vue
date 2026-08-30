@@ -11,7 +11,7 @@ const loading = ref(false)
 const firstForm = reactive({
   name: '',
   phone: '',
-  gender: '女',
+  gender: '',
   age: '',
   address: '',
   chiefComplaint: ''
@@ -30,7 +30,7 @@ async function onFirstVisit(): Promise<void> {
     await patientStore.firstVisit({
       name: firstForm.name.trim(),
       phone: firstForm.phone.trim() || undefined,
-      gender: firstForm.gender,
+      gender: firstForm.gender || undefined,
       age: firstForm.age ? Number(firstForm.age) : undefined,
       address: firstForm.address.trim() || undefined,
       chiefComplaint: firstForm.chiefComplaint.trim() || undefined
@@ -66,6 +66,9 @@ async function onFollowup(p: Patient): Promise<void> {
     loading.value = false
   }
 }
+
+// 预置复诊调档列表（对齐 UI 稿：显示已有患者档案）
+void patientStore.search('')
 </script>
 
 <template>
@@ -80,9 +83,10 @@ async function onFollowup(p: Patient): Promise<void> {
           <input v-model="firstForm.phone" class="inp" placeholder="手机号" />
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
-          <select v-model="firstForm.gender" class="inp">
-            <option>性别：女</option>
-            <option>性别：男</option>
+          <select v-model="firstForm.gender" class="inp" :class="{ placeholder: !firstForm.gender }">
+            <option value="" disabled>性别</option>
+            <option value="女">女</option>
+            <option value="男">男</option>
           </select>
           <input v-model="firstForm.age" class="inp" placeholder="年龄" />
         </div>
@@ -95,16 +99,16 @@ async function onFollowup(p: Patient): Promise<void> {
     <div style="border-left: 1px dashed var(--border-strong); padding-left: 20px">
       <div class="qs-title">🔁 复诊调档</div>
       <div class="qs-desc">已就诊过的患者，姓名 + 手机号调档，直接续方</div>
-      <div style="display: flex; gap: 8px; margin-bottom: 10px">
+      <div class="search-row">
         <input
           v-model="searchKw"
-          class="inp"
+          class="inp search-inp"
           placeholder="🔍 姓名 + 手机号，如：张丽华 138****2671"
           @keydown.enter="onSearch"
         />
-        <button class="btn btn-ghost" :disabled="searchLoading" @click="onSearch">搜索</button>
+        <button class="btn btn-ghost search-btn" :disabled="searchLoading" @click="onSearch">搜索</button>
       </div>
-      <div v-for="p in patientStore.searchResults" :key="p._id" class="qs-result">
+      <div v-for="p in patientStore.searchResults.slice(0, 2)" :key="p._id" class="qs-result">
         <div class="ava">{{ p.name[0] }}</div>
         <div style="flex: 1; min-width: 0">
           <b style="font-size: 13.5px">{{ p.name }}</b>
@@ -158,6 +162,20 @@ async function onFollowup(p: Patient): Promise<void> {
 .qs-result:hover {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px var(--primary-soft);
+}
+.search-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.search-inp {
+  flex: 1;
+  min-width: 0;
+}
+.search-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 .ava {
   width: 38px;

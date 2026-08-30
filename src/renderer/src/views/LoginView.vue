@@ -56,7 +56,6 @@ async function doLogin(): Promise<void> {
         <div class="feat"><div class="fi">🆕</div>医师直接建档首诊，复诊姓名+手机号秒级调档</div>
         <div class="feat"><div class="fi">✨</div>AI 临床辅助：诊断建议、用药安全、语音病历</div>
         <div class="feat"><div class="fi">🔏</div>CA 电子签名贯穿病历、处方、会诊全流程</div>
-        <div class="copy">创新概念版 · 演示环境 · 数据均为虚构</div>
       </div>
       <div class="login-right">
         <h2>欢迎回来 👋</h2>

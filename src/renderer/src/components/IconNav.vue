@@ -95,6 +95,7 @@ function go(view: string): void {
   color: var(--text-mute);
   margin: 3px 0;
   transition: 0.18s;
+  cursor: pointer;
 }
 .inav:hover {
   background: var(--card2);

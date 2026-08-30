@@ -1,32 +1,19 @@
 <script setup lang="ts">
-import type { Visit } from '@/api/types'
-
-defineProps<{ visits: Visit[] }>()
-
-function fmt(d: string | undefined): string {
-  if (!d) return ''
-  const date = new Date(d)
-  return `${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(
-    date.getHours()
-  ).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+export interface JourneyNode {
+  time: string
+  label: string
+  state: 'done' | 'current' | 'todo'
 }
 
-function label(v: Visit): string {
-  if (v.type === 'first') return '建档 · 首诊（医师创建）'
-  return '复诊调档'
-}
+/** 就诊旅程时间轴：建档 → 体征 → 接诊签名 → 处方审核 → 缴费取药（对齐 UI 稿） */
+defineProps<{ nodes: JourneyNode[] }>()
 </script>
 
 <template>
   <div class="journey">
-    <div v-for="(v, i) in visits" :key="String(v._id)" class="j-item" :class="{ done: true }">
-      <div class="jt">{{ fmt(v.visitedAt) }}</div>
-      <div class="jb">{{ label(v) }} · {{ v.department }}</div>
-      <div v-if="i === visits.length - 1" class="jt">进行中</div>
-    </div>
-    <div v-if="visits.length === 0" class="j-item">
-      <div class="jt">刚刚</div>
-      <div class="jb">建档 · 首诊（医师创建）</div>
+    <div v-for="(n, i) in nodes" :key="i" class="j-item" :class="n.state">
+      <div class="jt">{{ n.time }}</div>
+      <div class="jb">{{ n.label }}</div>
     </div>
   </div>
 </template>
@@ -65,6 +52,9 @@ function label(v: Visit): string {
 }
 .j-item.done::before {
   background: var(--primary);
+}
+.j-item.todo {
+  opacity: 0.55;
 }
 .jt {
   font-size: 11px;

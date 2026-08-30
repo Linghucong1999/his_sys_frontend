@@ -4,11 +4,13 @@ import { useRouter } from 'vue-router'
 import { usePatientStore } from '@/stores/patient'
 import { listRecords, saveRecord, signRecord } from '@/api/emr'
 import { listDictionaries } from '@/api/misc'
+import { fetchPatientPage } from '@/api/patients'
 import PatientJourney from '@/components/PatientJourney.vue'
 import type { JourneyNode } from '@/components/PatientJourney.vue'
 import EmrBlock from '@/components/EmrBlock.vue'
 import AiCopilotPanel from '@/components/AiCopilotPanel.vue'
 import type { DiagnosisItem, MedicalRecord } from '@/api/types'
+import type { Patient } from '@/api/types'
 import { buildRecordPrintHtml } from '@/utils/print'
 import PrintPreviewDialog from '@/components/PrintPreviewDialog.vue'
 import HisCombobox from '@/components/HisCombobox.vue'
@@ -166,13 +168,62 @@ function onPrint(): void {
   previewVisible.value = true
 }
 
+function ageOf(birthDate?: string): string {
+  if (!birthDate) return ''
+  const age = Math.floor((Date.now() - new Date(birthDate).getTime()) / (365 * 86400000))
+  return age > 0 ? `${age} 岁` : ''
+}
+
+/** 未接诊时：罗列全部就诊过的患者（每页 10 条翻页），支持随时调档接诊 */
+const PAGE_SIZE = 10
+const allPatients = ref<Patient[]>([])
+const patientPage = ref(1)
+const patientTotal = ref(0)
+const followupBusy = ref(false)
+
+const totalPages = computed(() => Math.max(1, Math.ceil(patientTotal.value / PAGE_SIZE)))
+
+/** 页码序列：总页数 ≤7 全部显示；否则 1 … 当前±1 … 末页 */
+const pageList = computed<number[]>(() => {
+  const total = totalPages.value
+  const cur = patientPage.value
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1)
+  }
+  const set = new Set<number>([1, total, cur - 1, cur, cur + 1])
+  return [...set].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b)
+})
+
+async function loadAllPatients(): Promise<void> {
+  const result = await fetchPatientPage(patientPage.value, PAGE_SIZE)
+  allPatients.value = result.items
+  patientTotal.value = result.total
+}
+
+async function goPage(p: number): Promise<void> {
+  if (p < 1 || p > totalPages.value || p === patientPage.value) return
+  patientPage.value = p
+  await loadAllPatients()
+}
+
+async function onFollowupFromList(p: Patient): Promise<void> {
+  followupBusy.value = true
+  try {
+    await patientStore.followup(p)
+  } catch (e) {
+    window.alert((e as Error).message)
+  } finally {
+    followupBusy.value = false
+  }
+}
+
 onMounted(() => {
   if (!patientStore.current) {
-    router.replace('/workbench')
-    return
+    void loadAllPatients()
+  } else {
+    void loadIcd()
+    void loadRecord()
   }
-  void loadIcd()
-  void loadRecord()
 })
 
 watch(() => patientStore.current, () => void loadRecord())
@@ -267,11 +318,58 @@ watch(() => patientStore.current, () => void loadRecord())
       />
     </div>
   </section>
-  <section v-else>
-    <div class="card" style="padding: 60px; text-align: center; color: var(--text-mute)">
-      请先从工作台「快速开始」建档或调档接诊，再进入患者 360° 工作站
-      <div style="margin-top: 14px">
-        <button class="btn btn-primary" @click="router.push('/workbench')">返回工作台</button>
+  <section v-else class="list-view">
+    <div class="sec-hd">
+      <div class="page-title">🔁 复诊调档 · 就诊患者一览</div>
+      <span class="tag tag-blue">共 {{ allPatients.length }} 位患者 · 按最新建档排序</span>
+      <div style="margin-left: auto">
+        <button class="btn btn-ghost" @click="router.push('/workbench')">返回工作台</button>
+      </div>
+    </div>
+    <div class="card" style="padding: 12px">
+      <div v-for="p in allPatients" :key="p._id" class="qs-result">
+        <div class="p-ava">{{ p.name[0] }}</div>
+        <div style="flex: 1; min-width: 0">
+          <b style="font-size: 13.5px">{{ p.name }}</b>
+          <span style="color: var(--text-mute); font-size: 11.5px">
+            {{ p.gender ?? '未知' }} · {{ ageOf(p.birthDate) || '—' }} · {{ p.phone ?? '' }}
+          </span>
+          <div style="font-size: 11.5px; color: var(--text-mute); margin-top: 2px">
+            档案号 {{ p.medicalRecordNo ?? p.empiId }}
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" :disabled="followupBusy" @click="onFollowupFromList(p)">
+          调档接诊
+        </button>
+      </div>
+      <div v-if="allPatients.length === 0" style="padding: 30px; text-align: center; color: var(--text-mute)">
+        暂无患者档案
+      </div>
+      <!-- 分页控件：每页 10 条 -->
+      <div v-if="patientTotal > PAGE_SIZE" class="pager">
+        <button class="btn btn-ghost btn-sm" :disabled="patientPage <= 1" @click="goPage(1)">« 首页</button>
+        <button class="btn btn-ghost btn-sm" :disabled="patientPage <= 1" @click="goPage(patientPage - 1)">
+          ‹ 上一页
+        </button>
+        <template v-for="(p, i) in pageList" :key="p">
+          <span v-if="i > 0 && p - pageList[i - 1] > 1" class="pager-dots">…</span>
+          <button class="pager-num" :class="{ active: p === patientPage }" @click="goPage(p)">
+            {{ p }}
+          </button>
+        </template>
+        <button
+          class="btn btn-ghost btn-sm"
+          :disabled="patientPage >= totalPages"
+          @click="goPage(patientPage + 1)"
+        >
+          下一页 ›
+        </button>
+        <button class="btn btn-ghost btn-sm" :disabled="patientPage >= totalPages" @click="goPage(totalPages)">
+          末页 »
+        </button>
+      </div>
+      <div v-if="patientTotal > PAGE_SIZE" class="pager-info2">
+        第 {{ patientPage }} / {{ totalPages }} 页 · 共 {{ patientTotal }} 位患者 · 每页 {{ PAGE_SIZE }} 条
       </div>
     </div>
   </section>
@@ -378,5 +476,76 @@ watch(() => patientStore.current, () => void loadRecord())
   .p360 {
     grid-template-columns: 1fr;
   }
+}
+.list-view .qs-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 8px;
+  transition: 0.15s;
+  cursor: pointer;
+}
+.list-view .qs-result:hover {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-soft);
+}
+.list-view .p-ava {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: var(--grad);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px 0 4px;
+  flex-wrap: wrap;
+}
+.pager-num {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--card);
+  color: var(--text-sub);
+  font-size: 12px;
+  cursor: pointer;
+  transition: 0.15s;
+}
+.pager-num:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.pager-num.active {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary);
+  font-weight: 700;
+}
+.pager-dots {
+  color: var(--text-mute);
+  padding: 0 2px;
+}
+.pager-info2 {
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--text-mute);
+  padding-bottom: 4px;
+}
+.pager-info {
+  font-size: 12px;
+  color: var(--text-mute);
 }
 </style>

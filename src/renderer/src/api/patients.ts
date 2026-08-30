@@ -20,3 +20,12 @@ export function searchPatients(keyword: string): Promise<Patient[]> {
 export function fetchPatient(id: string): Promise<Patient> {
   return request.get(`/patients/${id}`)
 }
+
+export interface PatientPage {
+  items: Patient[]
+  total: number
+}
+
+export function fetchPatientPage(page: number, pageSize = 10): Promise<PatientPage> {
+  return request.get('/patients/page', { params: { page, pageSize } })
+}

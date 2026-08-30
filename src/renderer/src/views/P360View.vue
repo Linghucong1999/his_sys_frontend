@@ -11,6 +11,7 @@ import AiCopilotPanel from '@/components/AiCopilotPanel.vue'
 import type { DiagnosisItem, MedicalRecord } from '@/api/types'
 import { buildRecordPrintHtml } from '@/utils/print'
 import PrintPreviewDialog from '@/components/PrintPreviewDialog.vue'
+import HisCombobox from '@/components/HisCombobox.vue'
 
 const router = useRouter()
 const patientStore = usePatientStore()
@@ -228,15 +229,11 @@ watch(() => patientStore.current, () => void loadRecord())
           </EmrBlock>
         </div>
         <EmrBlock v-if="tab === 'record'" label="初步诊断" ai="ICD-10 智能匹配" highlight>
-          <input
+          <HisCombobox
             v-model="form.diagnosisText"
-            class="inp plain"
-            list="icd-list"
-            placeholder="输入诊断，如：J15.9 社区获得性肺炎，非重症"
+            :options="icdOptions.map((d) => ({ value: d.code, label: d.name }))"
+            placeholder="输入诊断，或从下拉选择 ICD-10（多个诊断以「；」分隔）"
           />
-          <datalist id="icd-list">
-            <option v-for="d in icdOptions" :key="d.code" :value="`${d.code} ${d.name}`"></option>
-          </datalist>
         </EmrBlock>
         <EmrBlock v-if="tab === 'prescription'" label="处方内容" ai="用药安全校验">
           <textarea v-model="form.prescriptionSummary" class="inp plain" placeholder="处方内容…"></textarea>

@@ -57,7 +57,7 @@
 
 ## 界面预览
 
-截图存储于 `docs/screenshots/`（截图方式见 `docs/screenshots-guide.md`）。
+截图存储于 `docs/screenshots/`（截图方式见 `../tools/screenshots.md`）。
 
 | 视图 | 截图 |
 |---|---|

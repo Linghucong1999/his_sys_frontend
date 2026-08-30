@@ -2,7 +2,13 @@
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePatientStore } from '@/stores/patient'
+import HisSelect from '@/components/HisSelect.vue'
 import type { Patient } from '@/api/types'
+
+const GENDER_OPTIONS = [
+  { value: '女', label: '女' },
+  { value: '男', label: '男' }
+]
 
 const router = useRouter()
 const patientStore = usePatientStore()
@@ -83,11 +89,11 @@ void patientStore.search('')
           <input v-model="firstForm.phone" class="inp" placeholder="手机号" />
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
-          <select v-model="firstForm.gender" class="inp" :class="{ placeholder: !firstForm.gender }">
-            <option value="" disabled>性别</option>
-            <option value="女">女</option>
-            <option value="男">男</option>
-          </select>
+          <HisSelect
+            v-model="firstForm.gender"
+            :options="GENDER_OPTIONS"
+            placeholder="性别"
+          />
           <input v-model="firstForm.age" class="inp" placeholder="年龄" />
         </div>
         <input v-model="firstForm.address" class="inp" placeholder="住址（常住地址）" />

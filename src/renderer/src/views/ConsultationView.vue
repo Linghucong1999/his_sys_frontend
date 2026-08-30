@@ -4,6 +4,7 @@ import { createConsultation, listConsultations, respondConsultation, urgeConsult
 import { searchPatients } from '@/api/patients'
 import { listDictionaries } from '@/api/misc'
 import { useUserStore } from '@/stores/user'
+import HisSelect from '@/components/HisSelect.vue'
 import type { Consultation, Patient } from '@/api/types'
 
 const userStore = useUserStore()
@@ -175,13 +176,19 @@ onMounted(async () => {
             <span style="font-size: 11.5px; color: var(--text-mute)">{{ p.gender }} · {{ p.phone }}</span>
           </div>
           <div v-if="selectedPatient" class="sel-patient">已选：{{ selectedPatient.name }}</div>
-          <select v-model="form.toDept" class="inp">
-            <option v-for="d in depts" :key="d.name" :value="d.name">会诊科室：{{ d.name }}</option>
-          </select>
-          <select v-model="form.type" class="inp">
-            <option value="normal">普通会诊（24h 内响应）</option>
-            <option value="urgent">⚡ 急会诊（10 分钟内响应）</option>
-          </select>
+          <HisSelect
+            v-model="form.toDept"
+            :options="depts.map((d) => ({ value: d.name, label: d.name }))"
+            placeholder="会诊科室"
+          />
+          <HisSelect
+            v-model="form.type"
+            :options="[
+              { value: 'normal', label: '普通会诊（24h 内响应）' },
+              { value: 'urgent', label: '⚡ 急会诊（10 分钟内响应）' }
+            ]"
+            placeholder="会诊类型"
+          />
           <textarea v-model="form.summary" class="inp" placeholder="会诊事由与病情摘要…" style="min-height: 76px"></textarea>
           <div v-if="errorMsg" style="font-size: 12px; color: var(--red)">{{ errorMsg }}</div>
           <button class="btn btn-primary" :disabled="busy" @click="onSubmit">🔏 签名并提交申请</button>

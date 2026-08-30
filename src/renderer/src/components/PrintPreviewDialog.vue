@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import HisSelect from '@/components/HisSelect.vue'
 
 const props = defineProps<{
   visible: boolean
@@ -28,6 +29,15 @@ const PAPER_SIZES = [
 const paperRatio = computed(
   () => PAPER_SIZES.find((p) => p.value === pageSize.value)?.ratio ?? '210 / 297'
 )
+
+const printerOptions = computed(() =>
+  printers.value.map((p) => ({
+    value: p.name,
+    label: `${p.displayName}${p.isDefault ? '（默认）' : ''}`
+  }))
+)
+
+const PAPER_OPTIONS = PAPER_SIZES.map((p) => ({ value: p.value, label: p.label }))
 
 /** iframe 预览地址（data URL 渲染打印稿） */
 const previewUrl = computed(() =>
@@ -96,18 +106,15 @@ onMounted(() => {
         <div class="preview-ops">
           <div class="ops-sec">
             <div class="ops-label">打印机</div>
-            <select v-model="selectedPrinter" class="inp">
-              <option v-for="p in printers" :key="p.name" :value="p.name">
-                {{ p.displayName }}{{ p.isDefault ? '（默认）' : '' }}
-              </option>
-              <option v-if="printers.length === 0" value="" disabled>未检测到打印机</option>
-            </select>
+            <HisSelect
+              v-model="selectedPrinter"
+              :options="printerOptions"
+              placeholder="未检测到打印机"
+            />
           </div>
           <div class="ops-sec">
             <div class="ops-label">纸张</div>
-            <select v-model="pageSize" class="inp">
-              <option v-for="p in PAPER_SIZES" :key="p.value" :value="p.value">{{ p.label }}</option>
-            </select>
+            <HisSelect v-model="pageSize" :options="PAPER_OPTIONS" placeholder="纸张" />
           </div>
           <div class="ops-sec">
             <div class="ops-label">份数</div>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { reactive, ref, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePatientStore } from '@/stores/patient'
 import HisSelect from '@/components/HisSelect.vue'
@@ -75,6 +75,19 @@ async function onFollowup(p: Patient): Promise<void> {
 
 // 预置复诊调档列表（对齐 UI 稿：显示已有患者档案）
 void patientStore.search('')
+
+// 输入即搜：姓名/手机号/姓名+手机号，防抖 300ms 实时显示结果
+let searchTimer: ReturnType<typeof setTimeout> | undefined
+watch(searchKw, (v) => {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = setTimeout(() => {
+    void patientStore.search(v.trim()).catch(() => undefined)
+  }, 300)
+})
+
+onBeforeUnmount(() => {
+  if (searchTimer) clearTimeout(searchTimer)
+})
 </script>
 
 <template>

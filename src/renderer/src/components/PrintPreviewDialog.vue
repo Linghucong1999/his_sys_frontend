@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 const props = defineProps<{
   visible: boolean
@@ -12,10 +12,37 @@ const copies = ref(1)
 const printing = ref(false)
 const errorMsg = ref('')
 
+const printers = ref<Array<{ name: string; displayName: string; isDefault: boolean }>>([])
+const selectedPrinter = ref('')
+const pageSize = ref('A4')
+
+/** 纸张尺寸（Electron print pageSize 支持值）与预览宽高比 */
+const PAPER_SIZES = [
+  { value: 'A4', label: 'A4（210×297mm）', ratio: '210 / 297' },
+  { value: 'A5', label: 'A5（148×210mm）', ratio: '148 / 210' },
+  { value: 'B5', label: 'B5（176×250mm）', ratio: '176 / 250' },
+  { value: 'Letter', label: 'Letter（216×279mm）', ratio: '216 / 279' },
+  { value: 'Legal', label: 'Legal（216×356mm）', ratio: '216 / 356' }
+] as const
+
+const paperRatio = computed(
+  () => PAPER_SIZES.find((p) => p.value === pageSize.value)?.ratio ?? '210 / 297'
+)
+
 /** iframe 预览地址（data URL 渲染打印稿） */
 const previewUrl = computed(() =>
   props.printHtml ? 'data:text/html;charset=utf-8,' + encodeURIComponent(props.printHtml) : ''
 )
+
+async function loadPrinters(): Promise<void> {
+  try {
+    printers.value = await window.api.listPrinters()
+    const def = printers.value.find((p) => p.isDefault) ?? printers.value[0]
+    selectedPrinter.value = def?.name ?? ''
+  } catch {
+    printers.value = []
+  }
+}
 
 function close(): void {
   emit('update:visible', false)
@@ -27,7 +54,12 @@ async function doPrint(): Promise<void> {
   printing.value = true
   errorMsg.value = ''
   try {
-    const result = await window.api.printHtml(props.printHtml, { silent: true, copies: copies.value })
+    const result = await window.api.printHtml(props.printHtml, {
+      silent: true,
+      copies: copies.value,
+      deviceName: selectedPrinter.value || undefined,
+      pageSize: pageSize.value
+    })
     if (!result.ok) {
       errorMsg.value = `打印失败${result.reason ? '：' + result.reason : ''}`
       return
@@ -40,6 +72,10 @@ async function doPrint(): Promise<void> {
     printing.value = false
   }
 }
+
+onMounted(() => {
+  void loadPrinters()
+})
 </script>
 
 <template>
@@ -50,15 +86,28 @@ async function doPrint(): Promise<void> {
         <button class="icon-btn" title="关闭" @click="close">✕</button>
       </div>
       <div class="preview-body">
-        <!-- 左侧：打印稿预览（A4 等比缩放） -->
+        <!-- 左侧：打印稿预览（按所选纸张比例缩放） -->
         <div class="preview-page">
-          <iframe v-if="previewUrl" :src="previewUrl" class="preview-iframe" title="打印预览"></iframe>
+          <div class="preview-sheet" :style="{ aspectRatio: paperRatio }">
+            <iframe v-if="previewUrl" :src="previewUrl" class="preview-iframe" title="打印预览"></iframe>
+          </div>
         </div>
         <!-- 右侧：打印设置 -->
         <div class="preview-ops">
           <div class="ops-sec">
             <div class="ops-label">打印机</div>
-            <div class="ops-value">系统默认打印机（静默打印）</div>
+            <select v-model="selectedPrinter" class="inp">
+              <option v-for="p in printers" :key="p.name" :value="p.name">
+                {{ p.displayName }}{{ p.isDefault ? '（默认）' : '' }}
+              </option>
+              <option v-if="printers.length === 0" value="" disabled>未检测到打印机</option>
+            </select>
+          </div>
+          <div class="ops-sec">
+            <div class="ops-label">纸张</div>
+            <select v-model="pageSize" class="inp">
+              <option v-for="p in PAPER_SIZES" :key="p.value" :value="p.value">{{ p.label }}</option>
+            </select>
           </div>
           <div class="ops-sec">
             <div class="ops-label">份数</div>
@@ -150,16 +199,24 @@ async function doPrint(): Promise<void> {
   border-radius: 12px;
   padding: 14px;
   display: flex;
-  align-items: stretch;
-  min-height: 560px;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: auto;
 }
-.preview-iframe {
+.preview-sheet {
   width: 100%;
-  border: none;
+  max-width: 520px;
   background: #fff;
   border-radius: 6px;
   box-shadow: var(--shadow);
-  min-height: 540px;
+  overflow: hidden;
+}
+.preview-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: #fff;
+  display: block;
 }
 .preview-ops {
   display: flex;
@@ -176,9 +233,6 @@ async function doPrint(): Promise<void> {
   font-size: 11.5px;
   color: var(--text-mute);
   margin-bottom: 6px;
-}
-.ops-value {
-  font-size: 12.5px;
 }
 .copies-row {
   display: flex;

@@ -1,6 +1,10 @@
 import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import type { Size } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+
+/** B5 自定义纸张（176×250mm，微米单位，医疗病历常用尺寸） */
+const B5_SIZE: Size = { width: 176000, height: 250000 }
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -55,34 +59,67 @@ function getPrintWindow(): BrowserWindow {
 }
 
 function registerPrintHandler(): void {
+  // 系统打印机列表（渲染进程预览对话框下拉选择用）
+  ipcMain.handle('print:list-printers', async () => {
+    return (await getPrintWindow().webContents.getPrintersAsync()).map((p) => ({
+      name: p.name,
+      displayName: p.displayName,
+      status: p.status,
+      isDefault: p.isDefault
+    }))
+  })
+
   ipcMain.handle(
     'print:html',
-    async (_event, payload: { html: string; silent?: boolean; copies?: number }) => {
+    async (
+      _event,
+      payload: { html: string; silent?: boolean; copies?: number; deviceName?: string; pageSize?: string }
+    ) => {
       if (!payload || typeof payload.html !== 'string' || payload.html.length === 0) {
         throw new Error('打印内容无效')
       }
       const win = getPrintWindow()
       // 非静默打印（系统打印对话框）时需显示窗口，否则 Windows 下对话框不可见
       if (!payload.silent) win.show()
-      await win.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(payload.html))
-      return new Promise((resolve) => {
-        win.webContents.print(
-          {
-            silent: payload.silent ?? false,
-            printBackground: true,
-            copies: Math.max(1, payload.copies ?? 1)
-          },
-          (success, failureReason) => {
-            if (!success && failureReason) {
-              console.warn('打印失败:', failureReason)
+      // 打印稿写入临时文件后加载（data: URL 会被 CSP 拦截，临时文件不受影响）
+      const fs = await import('fs')
+      const os = await import('os')
+      const tmpFile = join(os.tmpdir(), `his-print-${Date.now()}-${Math.random().toString(36).slice(2)}.html`)
+      fs.writeFileSync(tmpFile, payload.html, 'utf-8')
+      try {
+        await win.loadFile(tmpFile)
+        return new Promise((resolve) => {
+          win.webContents.print(
+            {
+              silent: payload.silent ?? false,
+              printBackground: true,
+              copies: Math.max(1, payload.copies ?? 1),
+              deviceName: payload.deviceName || undefined,
+              pageSize:
+                payload.pageSize === 'B5'
+                  ? B5_SIZE
+                  : ((payload.pageSize as 'A4' | 'A5' | 'Letter' | 'Legal') || 'A4')
+            },
+            (success, failureReason) => {
+              if (!success && failureReason) {
+                console.warn('打印失败:', failureReason)
+              }
+              if (!payload.silent) {
+                win.hide()
+              }
+              fs.unlink(tmpFile, () => {
+                // 清理临时打印稿
+              })
+              resolve({ ok: success, reason: failureReason ?? null })
             }
-            if (!payload.silent) {
-              win.hide()
-            }
-            resolve({ ok: success, reason: failureReason ?? null })
-          }
-        )
-      })
+          )
+        })
+      } catch (e) {
+        fs.unlink(tmpFile, () => {
+          // 清理临时打印稿
+        })
+        throw e
+      }
     }
   )
 }

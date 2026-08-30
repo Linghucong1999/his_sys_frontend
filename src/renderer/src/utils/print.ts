@@ -47,7 +47,7 @@ export function buildRecordPrintHtml(record: MedicalRecord, patient?: Patient | 
 <head>
 <meta charset="UTF-8" />
 <style>
-  @page { margin: 20mm 18mm; }
+  @page { size: A4; margin: 20mm 18mm; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'SimSun', '宋体', serif; font-size: 12pt; color: #000; line-height: 1.8; }
   .doc { max-width: 160mm; margin: 0 auto; }

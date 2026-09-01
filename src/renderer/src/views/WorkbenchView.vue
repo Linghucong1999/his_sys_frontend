@@ -1,51 +1,3 @@
-<script setup lang="ts">
-import { computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useUserStore } from '@/stores/user'
-import { useTodoStore } from '@/stores/todo'
-import StatCard from '@/components/StatCard.vue'
-import QuickStartCard from '@/components/QuickStartCard.vue'
-import PaginatedList from '@/components/PaginatedList.vue'
-
-const router = useRouter()
-const userStore = useUserStore()
-const todoStore = useTodoStore()
-
-const greeting = computed(() => {
-  const h = new Date().getHours()
-  if (h < 12) return '早上好'
-  if (h < 18) return '下午好'
-  return '晚上好'
-})
-
-const dateText = computed(() => {
-  const d = new Date()
-  const week = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 星期${week} · 上午门诊`
-})
-
-onMounted(() => {
-  void todoStore.load()
-})
-
-function go(view: string): void {
-  router.push('/' + view)
-}
-
-/** 待办事项跳转：签名→EMR 待签名列表；处方/病历未完成→患者 360；会诊→会诊管理 */
-function goTodo(kind: string): void {
-  if (kind === 'sign') {
-    router.push({ path: '/emr', query: { filter: 'unsigned' } })
-  } else if (kind === 'rx' || kind === 'emr') {
-    router.push('/p360')
-  } else if (kind === 'consult') {
-    router.push('/consultations')
-  } else {
-    router.push('/inpatient')
-  }
-}
-</script>
-
 <template>
   <section>
     <div class="hero">
@@ -144,6 +96,54 @@ function goTodo(kind: string): void {
     </div>
   </section>
 </template>
+
+<script setup lang="ts">
+import { computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user'
+import { useTodoStore } from '@/stores/todo'
+import StatCard from '@/components/StatCard.vue'
+import QuickStartCard from '@/components/QuickStartCard.vue'
+import PaginatedList from '@/components/PaginatedList.vue'
+
+const router = useRouter()
+const userStore = useUserStore()
+const todoStore = useTodoStore()
+
+const greeting = computed(() => {
+  const h = new Date().getHours()
+  if (h < 12) return '早上好'
+  if (h < 18) return '下午好'
+  return '晚上好'
+})
+
+const dateText = computed(() => {
+  const d = new Date()
+  const week = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 星期${week} · 上午门诊`
+})
+
+onMounted(() => {
+  void todoStore.load()
+})
+
+function go(view: string): void {
+  router.push('/' + view)
+}
+
+/** 待办事项跳转：签名→EMR 待签名列表；处方/病历未完成→患者 360；会诊→会诊管理 */
+function goTodo(kind: string): void {
+  if (kind === 'sign') {
+    router.push({ path: '/emr', query: { filter: 'unsigned' } })
+  } else if (kind === 'rx' || kind === 'emr') {
+    router.push('/p360')
+  } else if (kind === 'consult') {
+    router.push('/consultations')
+  } else {
+    router.push('/inpatient')
+  }
+}
+</script>
 
 <style scoped>
 .hero {

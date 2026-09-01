@@ -1,55 +1,3 @@
-<script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { onClickOutside } from '@vueuse/core'
-import { useUserStore } from '@/stores/user'
-import { useTodoStore } from '@/stores/todo'
-import CommandPalette from '@/components/CommandPalette.vue'
-
-const userStore = useUserStore()
-const todoStore = useTodoStore()
-const router = useRouter()
-
-const paletteOpen = ref(false)
-const notifyOpen = ref(false)
-const userMenuOpen = ref(false)
-
-const notifyRef = ref<HTMLElement>()
-const userMenuRef = ref<HTMLElement>()
-onClickOutside(notifyRef, () => (notifyOpen.value = false))
-onClickOutside(userMenuRef, () => (userMenuOpen.value = false))
-
-onMounted(() => {
-  if (!todoStore.summary) void todoStore.load()
-})
-
-/** 🔏 CA 签名：跳转 EMR 待签名列表 */
-function goSigning(): void {
-  router.push({ path: '/emr', query: { filter: 'unsigned' } })
-}
-
-function goTodo(kind: string): void {
-  notifyOpen.value = false
-  if (kind === 'sign') router.push({ path: '/emr', query: { filter: 'unsigned' } })
-  else if (kind === 'rx' || kind === 'emr') router.push('/p360')
-  else if (kind === 'consult') router.push('/consultations')
-  else router.push('/inpatient')
-}
-
-function logout(): void {
-  userMenuOpen.value = false
-  userStore.logout()
-  router.push('/login')
-}
-
-const roleMap: Record<string, string> = {
-  admin: '管理员',
-  doctor: '医生',
-  nurse: '护士',
-  pharmacist: '药师'
-}
-</script>
-
 <template>
   <header class="topbar">
     <div class="brand">HIS 医疗信息管理系统</div>
@@ -103,6 +51,58 @@ const roleMap: Record<string, string> = {
   </header>
   <CommandPalette v-model="paletteOpen" />
 </template>
+
+<script setup lang="ts">
+import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { onClickOutside } from '@vueuse/core'
+import { useUserStore } from '@/stores/user'
+import { useTodoStore } from '@/stores/todo'
+import CommandPalette from '@/components/CommandPalette.vue'
+
+const userStore = useUserStore()
+const todoStore = useTodoStore()
+const router = useRouter()
+
+const paletteOpen = ref(false)
+const notifyOpen = ref(false)
+const userMenuOpen = ref(false)
+
+const notifyRef = ref<HTMLElement>()
+const userMenuRef = ref<HTMLElement>()
+onClickOutside(notifyRef, () => (notifyOpen.value = false))
+onClickOutside(userMenuRef, () => (userMenuOpen.value = false))
+
+onMounted(() => {
+  if (!todoStore.summary) void todoStore.load()
+})
+
+/** 🔏 CA 签名：跳转 EMR 待签名列表 */
+function goSigning(): void {
+  router.push({ path: '/emr', query: { filter: 'unsigned' } })
+}
+
+function goTodo(kind: string): void {
+  notifyOpen.value = false
+  if (kind === 'sign') router.push({ path: '/emr', query: { filter: 'unsigned' } })
+  else if (kind === 'rx' || kind === 'emr') router.push('/p360')
+  else if (kind === 'consult') router.push('/consultations')
+  else router.push('/inpatient')
+}
+
+function logout(): void {
+  userMenuOpen.value = false
+  userStore.logout()
+  router.push('/login')
+}
+
+const roleMap: Record<string, string> = {
+  admin: '管理员',
+  doctor: '医生',
+  nurse: '护士',
+  pharmacist: '药师'
+}
+</script>
 
 <style scoped>
 .topbar {

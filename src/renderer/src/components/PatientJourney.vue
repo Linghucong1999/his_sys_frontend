@@ -1,3 +1,12 @@
+<template>
+  <div class="journey">
+    <div v-for="(n, i) in nodes" :key="i" class="j-item" :class="n.state">
+      <div class="jt">{{ n.time }}</div>
+      <div class="jb">{{ n.label }}</div>
+    </div>
+  </div>
+</template>
+
 <script setup lang="ts">
 export interface JourneyNode {
   time: string
@@ -8,15 +17,6 @@ export interface JourneyNode {
 /** 就诊旅程时间轴：建档 → 体征 → 接诊签名 → 处方审核 → 缴费取药（对齐 UI 稿） */
 defineProps<{ nodes: JourneyNode[] }>()
 </script>
-
-<template>
-  <div class="journey">
-    <div v-for="(n, i) in nodes" :key="i" class="j-item" :class="n.state">
-      <div class="jt">{{ n.time }}</div>
-      <div class="jb">{{ n.label }}</div>
-    </div>
-  </div>
-</template>
 
 <style scoped>
 .journey {

@@ -1,49 +1,3 @@
-<script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { useUserStore } from '@/stores/user'
-
-const router = useRouter()
-const userStore = useUserStore()
-
-const username = ref('D1027')
-const password = ref('123456')
-const loading = ref(false)
-const errorMsg = ref('')
-
-const roles = [
-  { key: 'doctor', icon: '🩺', label: '医生' },
-  { key: 'nurse', icon: '💉', label: '护士' },
-  { key: 'pharmacist', icon: '💊', label: '药房' },
-  { key: 'admin', icon: '🛡', label: '管理员' }
-]
-const selectedRole = ref('doctor')
-
-const greeting = computed(() => {
-  const h = new Date().getHours()
-  if (h < 12) return '早上好'
-  if (h < 18) return '下午好'
-  return '晚上好'
-})
-
-async function doLogin(): Promise<void> {
-  if (!username.value || !password.value) {
-    errorMsg.value = '请输入工号和密码'
-    return
-  }
-  loading.value = true
-  errorMsg.value = ''
-  try {
-    await userStore.login(username.value.trim(), password.value)
-    router.push('/workbench')
-  } catch (e) {
-    errorMsg.value = (e as Error).message
-  } finally {
-    loading.value = false
-  }
-}
-</script>
-
 <template>
   <div class="login-view">
     <div class="login-card">
@@ -95,6 +49,52 @@ async function doLogin(): Promise<void> {
     </div>
   </div>
 </template>
+
+<script setup lang="ts">
+import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useUserStore } from '@/stores/user'
+
+const router = useRouter()
+const userStore = useUserStore()
+
+const username = ref('D1027')
+const password = ref('123456')
+const loading = ref(false)
+const errorMsg = ref('')
+
+const roles = [
+  { key: 'doctor', icon: '🩺', label: '医生' },
+  { key: 'nurse', icon: '💉', label: '护士' },
+  { key: 'pharmacist', icon: '💊', label: '药房' },
+  { key: 'admin', icon: '🛡', label: '管理员' }
+]
+const selectedRole = ref('doctor')
+
+const greeting = computed(() => {
+  const h = new Date().getHours()
+  if (h < 12) return '早上好'
+  if (h < 18) return '下午好'
+  return '晚上好'
+})
+
+async function doLogin(): Promise<void> {
+  if (!username.value || !password.value) {
+    errorMsg.value = '请输入工号和密码'
+    return
+  }
+  loading.value = true
+  errorMsg.value = ''
+  try {
+    await userStore.login(username.value.trim(), password.value)
+    router.push('/workbench')
+  } catch (e) {
+    errorMsg.value = (e as Error).message
+  } finally {
+    loading.value = false
+  }
+}
+</script>
 
 <style scoped>
 .login-view {

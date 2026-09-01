@@ -1,13 +1,3 @@
-<script setup lang="ts">
-defineProps<{
-  diagnoses: Array<{ name: string; conf: number }>
-  warnings: string[]
-  tips: string[]
-  similarCount?: number
-  similarDesc?: string
-}>()
-</script>
-
 <template>
   <div class="card ai-panel">
     <div class="ai-hd"><div class="sparkle">✨</div>AI 临床辅助</div>
@@ -29,6 +19,16 @@ defineProps<{
     </div>
   </div>
 </template>
+
+<script setup lang="ts">
+defineProps<{
+  diagnoses: Array<{ name: string; conf: number }>
+  warnings: string[]
+  tips: string[]
+  similarCount?: number
+  similarDesc?: string
+}>()
+</script>
 
 <style scoped>
 .ai-panel {

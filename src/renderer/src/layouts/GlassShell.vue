@@ -1,11 +1,3 @@
-<script setup lang="ts">
-import { RouterView, useRoute } from 'vue-router'
-import IconNav from '@/components/IconNav.vue'
-import TopBar from '@/components/TopBar.vue'
-
-const route = useRoute()
-</script>
-
 <template>
   <div class="shell">
     <IconNav />
@@ -20,6 +12,14 @@ const route = useRoute()
     </main>
   </div>
 </template>
+
+<script setup lang="ts">
+import { RouterView, useRoute } from 'vue-router'
+import IconNav from '@/components/IconNav.vue'
+import TopBar from '@/components/TopBar.vue'
+
+const route = useRoute()
+</script>
 
 <style scoped>
 .shell-main {

@@ -1,3 +1,42 @@
+<template>
+  <div v-if="modelValue" class="cmdk-mask open" @click.self="close">
+    <div class="cmdk-panel">
+      <div class="cmdk-input">
+        🔍
+        <input
+          ref="inputRef"
+          v-model="query"
+          placeholder="姓名 + 手机号搜索患者，或输入命令…"
+          @keydown.down.prevent="selected = Math.min(selected + 1, results.length - 1)"
+          @keydown.up.prevent="selected = Math.max(selected - 1, 0)"
+          @keydown.enter.prevent="results[selected] && execute(results[selected])"
+        />
+      </div>
+      <div class="cmdk-list">
+        <div
+          v-for="(item, i) in results"
+          :key="i"
+          class="cmdk-item"
+          :class="{ sel: i === selected }"
+          @click="execute(item)"
+          @mouseenter="selected = i"
+        >
+          <div class="ci">{{ ICONS[item.kind] ?? '🔍' }}</div>
+          <div style="min-width: 0">
+            <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ item.title }}</div>
+          </div>
+          <small>{{ item.sub }}</small>
+        </div>
+        <div v-if="results.length === 0" class="cmdk-empty">未找到匹配的患者 / 病历 / 药品</div>
+      </div>
+      <div class="cmdk-ft">
+        <span>↑↓ 选择</span><span>↵ 执行</span><span>esc 关闭</span>
+        <span style="margin-left: auto">HIS 医疗信息管理系统</span>
+      </div>
+    </div>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -72,45 +111,6 @@ watch(query, () => {
 onMounted(() => document.addEventListener('keydown', onKeydown))
 onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
 </script>
-
-<template>
-  <div v-if="modelValue" class="cmdk-mask open" @click.self="close">
-    <div class="cmdk-panel">
-      <div class="cmdk-input">
-        🔍
-        <input
-          ref="inputRef"
-          v-model="query"
-          placeholder="姓名 + 手机号搜索患者，或输入命令…"
-          @keydown.down.prevent="selected = Math.min(selected + 1, results.length - 1)"
-          @keydown.up.prevent="selected = Math.max(selected - 1, 0)"
-          @keydown.enter.prevent="results[selected] && execute(results[selected])"
-        />
-      </div>
-      <div class="cmdk-list">
-        <div
-          v-for="(item, i) in results"
-          :key="i"
-          class="cmdk-item"
-          :class="{ sel: i === selected }"
-          @click="execute(item)"
-          @mouseenter="selected = i"
-        >
-          <div class="ci">{{ ICONS[item.kind] ?? '🔍' }}</div>
-          <div style="min-width: 0">
-            <div style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ item.title }}</div>
-          </div>
-          <small>{{ item.sub }}</small>
-        </div>
-        <div v-if="results.length === 0" class="cmdk-empty">未找到匹配的患者 / 病历 / 药品</div>
-      </div>
-      <div class="cmdk-ft">
-        <span>↑↓ 选择</span><span>↵ 执行</span><span>esc 关闭</span>
-        <span style="margin-left: auto">HIS 医疗信息管理系统</span>
-      </div>
-    </div>
-  </div>
-</template>
 
 <style scoped>
 .cmdk-mask {

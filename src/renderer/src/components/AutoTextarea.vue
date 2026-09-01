@@ -1,3 +1,13 @@
+<template>
+  <textarea
+    ref="el"
+    class="auto-textarea"
+    :value="modelValue"
+    :placeholder="placeholder"
+    @input="onInput"
+  ></textarea>
+</template>
+
 <script setup lang="ts">
 import { nextTick, onMounted, ref, watch } from 'vue'
 
@@ -33,16 +43,6 @@ watch(
   }
 )
 </script>
-
-<template>
-  <textarea
-    ref="el"
-    class="auto-textarea"
-    :value="modelValue"
-    :placeholder="placeholder"
-    @input="onInput"
-  ></textarea>
-</template>
 
 <style scoped>
 .auto-textarea {

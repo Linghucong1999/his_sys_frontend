@@ -1,3 +1,13 @@
+<template>
+  <div class="card hover stat">
+    <div class="ico" :style="{ background: iconBg, color: iconColor }">{{ icon }}</div>
+    <div class="sl">{{ label }}</div>
+    <div class="sv">{{ value }}</div>
+    <div class="st" :class="subClass">{{ sub }}</div>
+    <Sparkline :points="points" :color="color" />
+  </div>
+</template>
+
 <script setup lang="ts">
 import Sparkline from '@/components/Sparkline.vue'
 
@@ -13,16 +23,6 @@ defineProps<{
   color: string
 }>()
 </script>
-
-<template>
-  <div class="card hover stat">
-    <div class="ico" :style="{ background: iconBg, color: iconColor }">{{ icon }}</div>
-    <div class="sl">{{ label }}</div>
-    <div class="sv">{{ value }}</div>
-    <div class="st" :class="subClass">{{ sub }}</div>
-    <Sparkline :points="points" :color="color" />
-  </div>
-</template>
 
 <style scoped>
 .stat {

@@ -1,11 +1,3 @@
-<script setup lang="ts">
-defineProps<{
-  label: string
-  ai?: string
-  highlight?: boolean
-}>()
-</script>
-
 <template>
   <div class="block" :class="{ hl: highlight }">
     <div class="bl">
@@ -15,6 +7,14 @@ defineProps<{
     <div class="bb"><slot /></div>
   </div>
 </template>
+
+<script setup lang="ts">
+defineProps<{
+  label: string
+  ai?: string
+  highlight?: boolean
+}>()
+</script>
 
 <style scoped>
 .block {

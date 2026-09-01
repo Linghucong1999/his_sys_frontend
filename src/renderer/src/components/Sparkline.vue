@@ -1,3 +1,9 @@
+<template>
+  <svg class="spark" viewBox="0 0 200 34" preserveAspectRatio="none">
+    <path :d="path" :stroke="color" />
+  </svg>
+</template>
+
 <script setup lang="ts">
 import { computed } from 'vue'
 
@@ -29,12 +35,6 @@ const path = computed(() => {
     .join(' ')
 })
 </script>
-
-<template>
-  <svg class="spark" viewBox="0 0 200 34" preserveAspectRatio="none">
-    <path :d="path" :stroke="color" />
-  </svg>
-</template>
 
 <style scoped>
 .spark {

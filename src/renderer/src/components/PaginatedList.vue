@@ -1,3 +1,15 @@
+<template>
+  <div ref="wrapRef" class="paginated-list">
+    <div class="pl-body">
+      <slot v-for="(it, i) in paged" :key="i" name="item" :item="it" :index="i" />
+      <div v-if="items.length === 0" class="pl-empty">
+        <slot name="empty">暂无数据</slot>
+      </div>
+    </div>
+    <Pagination :page="page" :total="items.length" :page-size="pageSize" @change="page = $event" />
+  </div>
+</template>
+
 <script setup lang="ts" generic="T">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import Pagination from './Pagination.vue'
@@ -59,18 +71,6 @@ watch(
   }
 )
 </script>
-
-<template>
-  <div ref="wrapRef" class="paginated-list">
-    <div class="pl-body">
-      <slot v-for="(it, i) in paged" :key="i" name="item" :item="it" :index="i" />
-      <div v-if="items.length === 0" class="pl-empty">
-        <slot name="empty">暂无数据</slot>
-      </div>
-    </div>
-    <Pagination :page="page" :total="items.length" :page-size="pageSize" @change="page = $event" />
-  </div>
-</template>
 
 <style scoped>
 .paginated-list {

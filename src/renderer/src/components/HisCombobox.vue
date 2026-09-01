@@ -1,3 +1,32 @@
+<template>
+  <div ref="wrapRef" class="his-combo">
+    <input
+      ref="inputRef"
+      class="combo-input"
+      :value="modelValue"
+      :placeholder="placeholder"
+      @input="onInput(($event.target as HTMLInputElement).value)"
+      @focus="positionPanel(); open = true"
+      @keydown.escape="open = false"
+    />
+    <Teleport to="body">
+      <Transition name="fade-up">
+        <div v-if="open && filtered.length > 0" ref="panelRef" class="combo-panel" :style="panelStyle">
+          <div
+            v-for="o in filtered"
+            :key="o.value"
+            class="combo-item"
+            @mousedown.prevent="pick(o)"
+          >
+            <span class="combo-code">{{ o.value }}</span>
+            <span class="combo-label">{{ o.label }}</span>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
@@ -94,35 +123,6 @@ function pick(opt: ComboboxOption): void {
   inputRef.value?.focus()
 }
 </script>
-
-<template>
-  <div ref="wrapRef" class="his-combo">
-    <input
-      ref="inputRef"
-      class="combo-input"
-      :value="modelValue"
-      :placeholder="placeholder"
-      @input="onInput(($event.target as HTMLInputElement).value)"
-      @focus="positionPanel(); open = true"
-      @keydown.escape="open = false"
-    />
-    <Teleport to="body">
-      <Transition name="fade-up">
-        <div v-if="open && filtered.length > 0" ref="panelRef" class="combo-panel" :style="panelStyle">
-          <div
-            v-for="o in filtered"
-            :key="o.value"
-            class="combo-item"
-            @mousedown.prevent="pick(o)"
-          >
-            <span class="combo-code">{{ o.value }}</span>
-            <span class="combo-label">{{ o.label }}</span>
-          </div>
-        </div>
-      </Transition>
-    </Teleport>
-  </div>
-</template>
 
 <style scoped>
 .his-combo {

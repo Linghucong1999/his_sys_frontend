@@ -1,70 +1,3 @@
-<script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { listBeds, listOrders, stopOrder } from '@/api/inpatient'
-import type { Bed, InpatientOrder } from '@/api/types'
-
-const wards = ['呼吸内科病区', '心内科病区']
-const activeWard = ref(wards[0])
-const beds = ref<Bed[]>([])
-const selectedBed = ref<Bed | null>(null)
-const orders = ref<InpatientOrder[]>([])
-const orderTab = ref<'long' | 'temp'>('long')
-const busy = ref(false)
-
-const filteredOrders = computed(() => orders.value.filter((o) => o.type === orderTab.value))
-
-async function loadBeds(): Promise<void> {
-  beds.value = await listBeds(activeWard.value)
-  if (!selectedBed.value && beds.value.length > 0) {
-    await selectBed(beds.value.find((b) => b.status === 'occupied') ?? beds.value[0])
-  }
-}
-
-async function selectBed(bed: Bed): Promise<void> {
-  selectedBed.value = bed
-  orders.value = bed.status === 'occupied' ? await listOrders({ bedNo: bed.bedNo }) : []
-}
-
-async function onStop(id: string): Promise<void> {
-  busy.value = true
-  try {
-    await stopOrder(id)
-    if (selectedBed.value) orders.value = await listOrders({ bedNo: selectedBed.value.bedNo })
-  } finally {
-    busy.value = false
-  }
-}
-
-const CATEGORY_TAG: Record<string, string> = { drug: '药物', nursing: '护理', exam: '检查' }
-const CATEGORY_CLASS: Record<string, string> = {
-  drug: 'tag-blue',
-  nursing: 'tag-green',
-  exam: 'tag-orange'
-}
-
-function patientAge(birthDate?: string): string {
-  if (!birthDate) return ''
-  const age = Math.floor((Date.now() - new Date(birthDate).getTime()) / (365 * 86400000))
-  return age > 0 ? `${age}岁` : ''
-}
-
-function patientInfo(b: Bed): string {
-  const p = typeof b.patientId === 'object' ? b.patientId : null
-  if (!p) return ''
-  return `${p.name} · ${p.gender ?? ''} ${patientAge(p.birthDate)}`
-}
-
-function patientMeta(b: Bed): string {
-  const p = typeof b.patientId === 'object' ? b.patientId : null
-  if (!p) return ''
-  return `${p.gender ?? '未知'} · ${patientAge(p.birthDate) || '—'}`
-}
-
-onMounted(() => {
-  void loadBeds()
-})
-</script>
-
 <template>
   <section>
     <div class="sec-hd">
@@ -157,6 +90,73 @@ onMounted(() => {
     </div>
   </section>
 </template>
+
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import { listBeds, listOrders, stopOrder } from '@/api/inpatient'
+import type { Bed, InpatientOrder } from '@/api/types'
+
+const wards = ['呼吸内科病区', '心内科病区']
+const activeWard = ref(wards[0])
+const beds = ref<Bed[]>([])
+const selectedBed = ref<Bed | null>(null)
+const orders = ref<InpatientOrder[]>([])
+const orderTab = ref<'long' | 'temp'>('long')
+const busy = ref(false)
+
+const filteredOrders = computed(() => orders.value.filter((o) => o.type === orderTab.value))
+
+async function loadBeds(): Promise<void> {
+  beds.value = await listBeds(activeWard.value)
+  if (!selectedBed.value && beds.value.length > 0) {
+    await selectBed(beds.value.find((b) => b.status === 'occupied') ?? beds.value[0])
+  }
+}
+
+async function selectBed(bed: Bed): Promise<void> {
+  selectedBed.value = bed
+  orders.value = bed.status === 'occupied' ? await listOrders({ bedNo: bed.bedNo }) : []
+}
+
+async function onStop(id: string): Promise<void> {
+  busy.value = true
+  try {
+    await stopOrder(id)
+    if (selectedBed.value) orders.value = await listOrders({ bedNo: selectedBed.value.bedNo })
+  } finally {
+    busy.value = false
+  }
+}
+
+const CATEGORY_TAG: Record<string, string> = { drug: '药物', nursing: '护理', exam: '检查' }
+const CATEGORY_CLASS: Record<string, string> = {
+  drug: 'tag-blue',
+  nursing: 'tag-green',
+  exam: 'tag-orange'
+}
+
+function patientAge(birthDate?: string): string {
+  if (!birthDate) return ''
+  const age = Math.floor((Date.now() - new Date(birthDate).getTime()) / (365 * 86400000))
+  return age > 0 ? `${age}岁` : ''
+}
+
+function patientInfo(b: Bed): string {
+  const p = typeof b.patientId === 'object' ? b.patientId : null
+  if (!p) return ''
+  return `${p.name} · ${p.gender ?? ''} ${patientAge(p.birthDate)}`
+}
+
+function patientMeta(b: Bed): string {
+  const p = typeof b.patientId === 'object' ? b.patientId : null
+  if (!p) return ''
+  return `${p.gender ?? '未知'} · ${patientAge(p.birthDate) || '—'}`
+}
+
+onMounted(() => {
+  void loadBeds()
+})
+</script>
 
 <style scoped>
 .grid2 {

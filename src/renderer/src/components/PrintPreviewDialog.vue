@@ -1,3 +1,53 @@
+<template>
+  <div v-if="visible" class="preview-mask" @click.self="close">
+    <div class="preview-panel">
+      <div class="preview-hd">
+        <span class="preview-title">🖨 打印预览 · {{ title }}</span>
+        <button class="icon-btn" title="关闭" @click="close">✕</button>
+      </div>
+      <div class="preview-body">
+        <!-- 左侧：打印稿预览（按所选纸张比例缩放） -->
+        <div class="preview-page">
+          <div class="preview-sheet" :style="{ aspectRatio: paperRatio }">
+            <iframe v-if="previewUrl" :src="previewUrl" class="preview-iframe" title="打印预览"></iframe>
+          </div>
+        </div>
+        <!-- 右侧：打印设置 -->
+        <div class="preview-ops">
+          <div class="ops-sec">
+            <div class="ops-label">打印机</div>
+            <HisSelect
+              v-model="selectedPrinter"
+              :options="printerOptions"
+              placeholder="未检测到打印机"
+            />
+          </div>
+          <div class="ops-sec">
+            <div class="ops-label">纸张</div>
+            <HisSelect v-model="pageSize" :options="PAPER_OPTIONS" placeholder="纸张" />
+          </div>
+          <div class="ops-sec">
+            <div class="ops-label">份数</div>
+            <div class="copies-row">
+              <button class="btn btn-ghost btn-sm" @click="copies = Math.max(1, copies - 1)">−</button>
+              <span class="copies-num">{{ copies }}</span>
+              <button class="btn btn-ghost btn-sm" @click="copies = copies + 1">＋</button>
+            </div>
+          </div>
+          <div class="ops-tip">打印稿与预览一致，包含医院抬头与医师签名栏。</div>
+          <div v-if="errorMsg" class="err">{{ errorMsg }}</div>
+        </div>
+      </div>
+      <div class="preview-ft">
+        <button class="btn btn-ghost" @click="close">取消</button>
+        <button class="btn btn-primary" :disabled="printing" @click="doPrint">
+          {{ printing ? '打印中…' : `🖨 打印（${copies} 份）` }}
+        </button>
+      </div>
+    </div>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import HisSelect from '@/components/HisSelect.vue'
@@ -87,56 +137,6 @@ onMounted(() => {
   void loadPrinters()
 })
 </script>
-
-<template>
-  <div v-if="visible" class="preview-mask" @click.self="close">
-    <div class="preview-panel">
-      <div class="preview-hd">
-        <span class="preview-title">🖨 打印预览 · {{ title }}</span>
-        <button class="icon-btn" title="关闭" @click="close">✕</button>
-      </div>
-      <div class="preview-body">
-        <!-- 左侧：打印稿预览（按所选纸张比例缩放） -->
-        <div class="preview-page">
-          <div class="preview-sheet" :style="{ aspectRatio: paperRatio }">
-            <iframe v-if="previewUrl" :src="previewUrl" class="preview-iframe" title="打印预览"></iframe>
-          </div>
-        </div>
-        <!-- 右侧：打印设置 -->
-        <div class="preview-ops">
-          <div class="ops-sec">
-            <div class="ops-label">打印机</div>
-            <HisSelect
-              v-model="selectedPrinter"
-              :options="printerOptions"
-              placeholder="未检测到打印机"
-            />
-          </div>
-          <div class="ops-sec">
-            <div class="ops-label">纸张</div>
-            <HisSelect v-model="pageSize" :options="PAPER_OPTIONS" placeholder="纸张" />
-          </div>
-          <div class="ops-sec">
-            <div class="ops-label">份数</div>
-            <div class="copies-row">
-              <button class="btn btn-ghost btn-sm" @click="copies = Math.max(1, copies - 1)">−</button>
-              <span class="copies-num">{{ copies }}</span>
-              <button class="btn btn-ghost btn-sm" @click="copies = copies + 1">＋</button>
-            </div>
-          </div>
-          <div class="ops-tip">打印稿与预览一致，包含医院抬头与医师签名栏。</div>
-          <div v-if="errorMsg" class="err">{{ errorMsg }}</div>
-        </div>
-      </div>
-      <div class="preview-ft">
-        <button class="btn btn-ghost" @click="close">取消</button>
-        <button class="btn btn-primary" :disabled="printing" @click="doPrint">
-          {{ printing ? '打印中…' : `🖨 打印（${copies} 份）` }}
-        </button>
-      </div>
-    </div>
-  </div>
-</template>
 
 <style scoped>
 .preview-mask {

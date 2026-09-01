@@ -1,3 +1,23 @@
+<template>
+  <div v-if="total > pageSize" class="his-pager">
+    <div class="row">
+      <button class="btn btn-ghost btn-sm" :disabled="page <= 1" @click="go(1)">« 首页</button>
+      <button class="btn btn-ghost btn-sm" :disabled="page <= 1" @click="go(page - 1)">‹ 上一页</button>
+      <template v-for="(p, i) in pageList" :key="p">
+        <span v-if="i > 0 && p - pageList[i - 1] > 1" class="dots">…</span>
+        <button class="num" :class="{ active: p === page }" @click="go(p)">{{ p }}</button>
+      </template>
+      <button class="btn btn-ghost btn-sm" :disabled="page >= totalPages" @click="go(page + 1)">
+        下一页 ›
+      </button>
+      <button class="btn btn-ghost btn-sm" :disabled="page >= totalPages" @click="go(totalPages)">
+        末页 »
+      </button>
+    </div>
+    <div class="info">第 {{ page }} / {{ totalPages }} 页 · 共 {{ total }} 条 · 每页 {{ pageSize }} 条</div>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed } from 'vue'
 
@@ -29,26 +49,6 @@ function go(p: number): void {
   emit('change', p)
 }
 </script>
-
-<template>
-  <div v-if="total > pageSize" class="his-pager">
-    <div class="row">
-      <button class="btn btn-ghost btn-sm" :disabled="page <= 1" @click="go(1)">« 首页</button>
-      <button class="btn btn-ghost btn-sm" :disabled="page <= 1" @click="go(page - 1)">‹ 上一页</button>
-      <template v-for="(p, i) in pageList" :key="p">
-        <span v-if="i > 0 && p - pageList[i - 1] > 1" class="dots">…</span>
-        <button class="num" :class="{ active: p === page }" @click="go(p)">{{ p }}</button>
-      </template>
-      <button class="btn btn-ghost btn-sm" :disabled="page >= totalPages" @click="go(page + 1)">
-        下一页 ›
-      </button>
-      <button class="btn btn-ghost btn-sm" :disabled="page >= totalPages" @click="go(totalPages)">
-        末页 »
-      </button>
-    </div>
-    <div class="info">第 {{ page }} / {{ totalPages }} 页 · 共 {{ total }} 条 · 每页 {{ pageSize }} 条</div>
-  </div>
-</template>
 
 <style scoped>
 .his-pager {

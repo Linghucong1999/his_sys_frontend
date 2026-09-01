@@ -1,3 +1,32 @@
+<template>
+  <div ref="wrapRef" class="his-select">
+    <div
+      class="select-trigger"
+      :class="{ placeholder: !modelValue }"
+      @click="toggle"
+    >
+      <span class="select-text">{{ modelValue ? currentLabel : placeholder }}</span>
+      <span class="select-arrow" :class="{ open }"></span>
+    </div>
+    <Teleport to="body">
+      <Transition name="fade-up">
+        <div v-if="open" ref="panelRef" class="select-panel" :style="panelStyle">
+          <div
+            v-for="o in options"
+            :key="o.value"
+            class="select-item"
+            :class="{ sel: o.value === modelValue }"
+            @click="select(o.value)"
+          >
+            {{ o.label }}
+          </div>
+          <div v-if="options.length === 0" class="select-empty">暂无选项</div>
+        </div>
+      </Transition>
+    </Teleport>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
@@ -73,35 +102,6 @@ function select(v: string): void {
   open.value = false
 }
 </script>
-
-<template>
-  <div ref="wrapRef" class="his-select">
-    <div
-      class="select-trigger"
-      :class="{ placeholder: !modelValue }"
-      @click="toggle"
-    >
-      <span class="select-text">{{ modelValue ? currentLabel : placeholder }}</span>
-      <span class="select-arrow" :class="{ open }"></span>
-    </div>
-    <Teleport to="body">
-      <Transition name="fade-up">
-        <div v-if="open" ref="panelRef" class="select-panel" :style="panelStyle">
-          <div
-            v-for="o in options"
-            :key="o.value"
-            class="select-item"
-            :class="{ sel: o.value === modelValue }"
-            @click="select(o.value)"
-          >
-            {{ o.label }}
-          </div>
-          <div v-if="options.length === 0" class="select-empty">暂无选项</div>
-        </div>
-      </Transition>
-    </Teleport>
-  </div>
-</template>
 
 <style scoped>
 .his-select {

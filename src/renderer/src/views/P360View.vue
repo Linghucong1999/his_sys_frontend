@@ -1,3 +1,126 @@
+<template>
+  <section v-if="patient">
+    <div class="p360">
+      <!-- 左：患者卡 + 旅程 -->
+      <div class="card pcard">
+        <div style="display: flex; gap: 12px; align-items: center">
+          <div class="pava">{{ patient.name[0] }}</div>
+          <div>
+            <div style="font-size: 16px; font-weight: 700">{{ patient.name }}</div>
+            <div style="font-size: 11.5px; color: var(--text-mute)">
+              {{ patient.gender ?? '未知' }} · 档案号 {{ patient.medicalRecordNo ?? patient.empiId }}
+            </div>
+          </div>
+        </div>
+        <div class="tags" style="margin-top: 12px">
+          <span class="tag tag-blue">医保：{{ patient.insuranceType ?? '自费' }}</span>
+          <span v-if="form.pastHistory.includes('过敏')" class="tag tag-red">⚠ 过敏史</span>
+          <span v-else class="tag tag-green">无过敏史</span>
+        </div>
+        <div class="ai-sec" style="margin-top: 16px">就诊旅程</div>
+        <PatientJourney :nodes="journeyNodes" />
+      </div>
+
+      <!-- 中：区块化病历编辑器 -->
+      <div class="card editor">
+        <div class="editor-hd">
+          <div class="tabs">
+            <div class="tab" :class="{ active: tab === 'record' }" @click="tab = 'record'">门诊病历</div>
+            <div class="tab" :class="{ active: tab === 'prescription' }" @click="tab = 'prescription'">处方</div>
+            <div class="tab" :class="{ active: tab === 'exam' }" @click="tab = 'exam'">检查申请</div>
+          </div>
+          <span class="tag" :class="signed ? 'tag-green' : 'tag-orange'" style="margin-left: auto">
+            {{ signed ? `🔏 已 CA 签名 ${currentRecord?.signedBy ?? ''}` : savedTip || '草稿未签名' }}
+          </span>
+        </div>
+
+        <EmrBlock v-if="tab === 'record'" label="主诉" ai="✨ AI 生成">
+          <AutoTextarea v-model="form.chiefComplaint" placeholder="主诉…" />
+        </EmrBlock>
+        <EmrBlock v-if="tab === 'record'" label="现病史" ai="✨ 语音转写">
+          <AutoTextarea v-model="form.presentIllness" placeholder="现病史…" />
+        </EmrBlock>
+        <div v-if="tab === 'record'" class="two-col">
+          <EmrBlock label="既往史">
+            <AutoTextarea v-model="form.pastHistory" placeholder="既往史…" />
+          </EmrBlock>
+          <EmrBlock label="体格检查">
+            <AutoTextarea v-model="form.physicalExam" placeholder="体格检查…" />
+          </EmrBlock>
+        </div>
+        <EmrBlock v-if="tab === 'record'" label="初步诊断" ai="ICD-10 智能匹配" highlight>
+          <HisCombobox
+            v-model="form.diagnosisText"
+            :options="icdOptions.map((d) => ({ value: d.code, label: d.name }))"
+            placeholder="输入诊断，或从下拉选择 ICD-10（多个诊断以「；」分隔）"
+          />
+        </EmrBlock>
+        <EmrBlock v-if="tab === 'prescription'" label="处方内容" ai="用药安全校验">
+          <AutoTextarea v-model="form.prescriptionSummary" placeholder="处方内容…" />
+        </EmrBlock>
+        <EmrBlock v-if="tab === 'exam'" label="检查申请">
+          <AutoTextarea v-model="form.examRequest" placeholder="检查项目与临床指征（CA 签名前必填）" />
+        </EmrBlock>
+
+        <div v-if="errorMsg" class="err">{{ errorMsg }}</div>
+        <div class="editor-ft">
+          <button class="btn btn-ghost">存为模板</button>
+          <button class="btn btn-ghost" @click="onPrint">打印</button>
+          <button class="btn btn-ghost" :disabled="busy" @click="onSave">保存</button>
+          <button class="btn btn-primary" :disabled="busy || signed" @click="onSign">
+            {{ signed ? '已 CA 签名' : '🔏 CA 签名并完成接诊' }}
+          </button>
+        </div>
+      </div>
+
+      <!-- 右：AI 辅助面板 -->
+      <AiCopilotPanel
+        :diagnoses="[
+          { name: '社区获得性肺炎', conf: 87 },
+          { name: '急性支气管炎', conf: 64 },
+          { name: '上呼吸道感染', conf: 41 }
+        ]"
+        :warnings="[
+          '<b>禁用青霉素类</b>：患者青霉素过敏史，阿莫西林已被智能替换为左氧氟沙星。'
+        ]"
+        :tips="['头孢呋辛与当前诊断匹配，无相互作用风险。']"
+      />
+    </div>
+  </section>
+  <section v-else class="list-view">
+    <div class="sec-hd">
+      <div class="page-title">🔁 复诊调档 · 就诊患者一览</div>
+      <span class="tag tag-blue">共 {{ allPatients.length }} 位患者 · 按最新建档排序</span>
+      <div style="margin-left: auto">
+        <button class="btn btn-ghost" @click="router.push('/workbench')">返回工作台</button>
+      </div>
+    </div>
+    <div class="card" style="padding: 12px">
+      <div v-for="p in allPatients" :key="p._id" class="qs-result">
+        <div class="p-ava">{{ p.name[0] }}</div>
+        <div style="flex: 1; min-width: 0">
+          <b style="font-size: 13.5px">{{ p.name }}</b>
+          <span style="color: var(--text-mute); font-size: 11.5px">
+            {{ p.gender ?? '未知' }} · {{ ageOf(p.birthDate) || '—' }} · {{ p.phone ?? '' }}
+          </span>
+          <div style="font-size: 11.5px; color: var(--text-mute); margin-top: 2px">
+            档案号 {{ p.medicalRecordNo ?? p.empiId }}
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" :disabled="followupBusy" @click="onFollowupFromList(p)">
+          调档接诊
+        </button>
+      </div>
+      <div v-if="allPatients.length === 0" style="padding: 30px; text-align: center; color: var(--text-mute)">
+        暂无患者档案
+      </div>
+      <!-- 分页控件：每页 10 条 -->
+      <Pagination :page="patientPage" :total="patientTotal" :page-size="PAGE_SIZE" @change="goPage" />
+    </div>
+  </section>
+  <PrintPreviewDialog v-model:visible="previewVisible" :title="previewTitle" :print-html="previewHtml" />
+</template>
+
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
@@ -232,129 +355,6 @@ onMounted(() => {
 
 watch(() => patientStore.current, () => void loadRecord())
 </script>
-
-<template>
-  <section v-if="patient">
-    <div class="p360">
-      <!-- 左：患者卡 + 旅程 -->
-      <div class="card pcard">
-        <div style="display: flex; gap: 12px; align-items: center">
-          <div class="pava">{{ patient.name[0] }}</div>
-          <div>
-            <div style="font-size: 16px; font-weight: 700">{{ patient.name }}</div>
-            <div style="font-size: 11.5px; color: var(--text-mute)">
-              {{ patient.gender ?? '未知' }} · 档案号 {{ patient.medicalRecordNo ?? patient.empiId }}
-            </div>
-          </div>
-        </div>
-        <div class="tags" style="margin-top: 12px">
-          <span class="tag tag-blue">医保：{{ patient.insuranceType ?? '自费' }}</span>
-          <span v-if="form.pastHistory.includes('过敏')" class="tag tag-red">⚠ 过敏史</span>
-          <span v-else class="tag tag-green">无过敏史</span>
-        </div>
-        <div class="ai-sec" style="margin-top: 16px">就诊旅程</div>
-        <PatientJourney :nodes="journeyNodes" />
-      </div>
-
-      <!-- 中：区块化病历编辑器 -->
-      <div class="card editor">
-        <div class="editor-hd">
-          <div class="tabs">
-            <div class="tab" :class="{ active: tab === 'record' }" @click="tab = 'record'">门诊病历</div>
-            <div class="tab" :class="{ active: tab === 'prescription' }" @click="tab = 'prescription'">处方</div>
-            <div class="tab" :class="{ active: tab === 'exam' }" @click="tab = 'exam'">检查申请</div>
-          </div>
-          <span class="tag" :class="signed ? 'tag-green' : 'tag-orange'" style="margin-left: auto">
-            {{ signed ? `🔏 已 CA 签名 ${currentRecord?.signedBy ?? ''}` : savedTip || '草稿未签名' }}
-          </span>
-        </div>
-
-        <EmrBlock v-if="tab === 'record'" label="主诉" ai="✨ AI 生成">
-          <AutoTextarea v-model="form.chiefComplaint" placeholder="主诉…" />
-        </EmrBlock>
-        <EmrBlock v-if="tab === 'record'" label="现病史" ai="✨ 语音转写">
-          <AutoTextarea v-model="form.presentIllness" placeholder="现病史…" />
-        </EmrBlock>
-        <div v-if="tab === 'record'" class="two-col">
-          <EmrBlock label="既往史">
-            <AutoTextarea v-model="form.pastHistory" placeholder="既往史…" />
-          </EmrBlock>
-          <EmrBlock label="体格检查">
-            <AutoTextarea v-model="form.physicalExam" placeholder="体格检查…" />
-          </EmrBlock>
-        </div>
-        <EmrBlock v-if="tab === 'record'" label="初步诊断" ai="ICD-10 智能匹配" highlight>
-          <HisCombobox
-            v-model="form.diagnosisText"
-            :options="icdOptions.map((d) => ({ value: d.code, label: d.name }))"
-            placeholder="输入诊断，或从下拉选择 ICD-10（多个诊断以「；」分隔）"
-          />
-        </EmrBlock>
-        <EmrBlock v-if="tab === 'prescription'" label="处方内容" ai="用药安全校验">
-          <AutoTextarea v-model="form.prescriptionSummary" placeholder="处方内容…" />
-        </EmrBlock>
-        <EmrBlock v-if="tab === 'exam'" label="检查申请">
-          <AutoTextarea v-model="form.examRequest" placeholder="检查项目与临床指征（CA 签名前必填）" />
-        </EmrBlock>
-
-        <div v-if="errorMsg" class="err">{{ errorMsg }}</div>
-        <div class="editor-ft">
-          <button class="btn btn-ghost">存为模板</button>
-          <button class="btn btn-ghost" @click="onPrint">打印</button>
-          <button class="btn btn-ghost" :disabled="busy" @click="onSave">保存</button>
-          <button class="btn btn-primary" :disabled="busy || signed" @click="onSign">
-            {{ signed ? '已 CA 签名' : '🔏 CA 签名并完成接诊' }}
-          </button>
-        </div>
-      </div>
-
-      <!-- 右：AI 辅助面板 -->
-      <AiCopilotPanel
-        :diagnoses="[
-          { name: '社区获得性肺炎', conf: 87 },
-          { name: '急性支气管炎', conf: 64 },
-          { name: '上呼吸道感染', conf: 41 }
-        ]"
-        :warnings="[
-          '<b>禁用青霉素类</b>：患者青霉素过敏史，阿莫西林已被智能替换为左氧氟沙星。'
-        ]"
-        :tips="['头孢呋辛与当前诊断匹配，无相互作用风险。']"
-      />
-    </div>
-  </section>
-  <section v-else class="list-view">
-    <div class="sec-hd">
-      <div class="page-title">🔁 复诊调档 · 就诊患者一览</div>
-      <span class="tag tag-blue">共 {{ allPatients.length }} 位患者 · 按最新建档排序</span>
-      <div style="margin-left: auto">
-        <button class="btn btn-ghost" @click="router.push('/workbench')">返回工作台</button>
-      </div>
-    </div>
-    <div class="card" style="padding: 12px">
-      <div v-for="p in allPatients" :key="p._id" class="qs-result">
-        <div class="p-ava">{{ p.name[0] }}</div>
-        <div style="flex: 1; min-width: 0">
-          <b style="font-size: 13.5px">{{ p.name }}</b>
-          <span style="color: var(--text-mute); font-size: 11.5px">
-            {{ p.gender ?? '未知' }} · {{ ageOf(p.birthDate) || '—' }} · {{ p.phone ?? '' }}
-          </span>
-          <div style="font-size: 11.5px; color: var(--text-mute); margin-top: 2px">
-            档案号 {{ p.medicalRecordNo ?? p.empiId }}
-          </div>
-        </div>
-        <button class="btn btn-primary btn-sm" :disabled="followupBusy" @click="onFollowupFromList(p)">
-          调档接诊
-        </button>
-      </div>
-      <div v-if="allPatients.length === 0" style="padding: 30px; text-align: center; color: var(--text-mute)">
-        暂无患者档案
-      </div>
-      <!-- 分页控件：每页 10 条 -->
-      <Pagination :page="patientPage" :total="patientTotal" :page-size="PAGE_SIZE" @change="goPage" />
-    </div>
-  </section>
-  <PrintPreviewDialog v-model:visible="previewVisible" :title="previewTitle" :print-html="previewHtml" />
-</template>
 
 <style scoped>
 .p360 {

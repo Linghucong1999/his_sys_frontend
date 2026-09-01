@@ -1,3 +1,102 @@
+<template>
+  <section class="emr-page">
+    <div class="sec-hd">
+      <div class="page-title">📋 电子病历</div>
+      <input
+        v-model="keyword"
+        class="inp"
+        placeholder="🔍 姓名 + 手机号 / 档案号"
+        style="width: 260px"
+        @keydown.enter="onSearch"
+      />
+      <button class="btn btn-ghost btn-sm" @click="onSearch">搜索</button>
+      <div class="chip" :class="{ active: filter === 'all' }" @click="changeFilter('all')">全部</div>
+      <div class="chip" :class="{ active: filter === 'unsigned' }" @click="changeFilter('unsigned')">待签名</div>
+      <div class="chip" :class="{ active: filter === 'signed' }" @click="changeFilter('signed')">已签名</div>
+      <div class="chip" :class="{ active: filter === 'recent' }" @click="changeFilter('recent')">近 30 天 ▾</div>
+      <span class="tag tag-blue" style="margin-left: auto">共 {{ total }} 条</span>
+    </div>
+
+    <!-- 左右模块随视窗高度自适应，内部滚动 -->
+    <div class="grid2">
+      <!-- 左侧：病历列表（分页） -->
+      <div class="card left-card">
+        <div class="emr-list">
+          <div
+            v-for="r in records"
+            :key="r._id"
+            class="emr-item"
+            :class="{ sel: selected?._id === r._id }"
+            @click="selected = r"
+          >
+            <div class="ed">{{ fmt(r.visitedAt) }}<br /><small>{{ isToday(r.visitedAt) ? '今日' : '' }}</small></div>
+            <div class="tt" style="flex: 1; min-width: 0">
+              <b style="font-size: 13px">{{ r.patientName }} · {{ r.diagnosis[0]?.name ?? '—' }}</b>
+              <div style="font-size: 11.5px; color: var(--text-mute); margin-top: 1px">
+                {{ r.type === 'prescription' ? '处方' : r.type === 'admission' ? '入院记录' : '门诊病历' }} · {{ r.department }}
+              </div>
+            </div>
+            <span class="tag" :class="r.signed ? 'tag-green' : 'tag-orange'">{{ r.signed ? '已签名' : '待签名' }}</span>
+          </div>
+          <div v-if="records.length === 0" class="empty">暂无病历</div>
+        </div>
+        <Pagination :page="page" :total="total" :page-size="pageSize" @change="goPage" />
+      </div>
+
+      <!-- 右侧：病历预览（随高度滚动） -->
+      <div v-if="selected" class="card right-card">
+        <div class="prev-hd">
+          <b style="font-size: 15px">
+            {{ selected.type === 'prescription' ? '处方' : selected.type === 'admission' ? '入院记录' : '门诊病历' }} · {{ selected.patientName }}
+          </b>
+          <span class="tag tag-blue">{{ selected.recordNo }}</span>
+          <span class="tag" :class="selected.signed ? 'tag-green' : 'tag-orange'">
+            {{ selected.signed ? `🔏 已 CA 签名 ${selected.signedAt ? new Date(selected.signedAt).toLocaleString('zh-CN') : ''}` : '待签名' }}
+          </span>
+          <span style="margin-left: auto; font-size: 11.5px; color: var(--text-mute)">
+            {{ fmtFull(selected.visitedAt) }} · {{ selected.doctorName }} · {{ selected.department }}
+          </span>
+        </div>
+        <div class="prev-body">
+          <div v-if="selected.chiefComplaint" class="block">
+            <div class="bl">主诉</div>
+            <div class="bb">{{ selected.chiefComplaint }}</div>
+          </div>
+          <div v-if="selected.presentIllness" class="block">
+            <div class="bl">现病史</div>
+            <div class="bb">{{ selected.presentIllness }}</div>
+          </div>
+          <div v-if="selected.pastHistory" class="block">
+            <div class="bl">既往史</div>
+            <div class="bb">{{ selected.pastHistory }}</div>
+          </div>
+          <div v-if="selected.physicalExam" class="block">
+            <div class="bl">体格检查</div>
+            <div class="bb">{{ selected.physicalExam }}</div>
+          </div>
+          <div v-if="selected.diagnosis.length > 0" class="block hl">
+            <div class="bl">诊断</div>
+            <div class="bb" style="font-weight: 600">
+              <div v-for="d in selected.diagnosis" :key="d.code">{{ d.code }} {{ d.name }}</div>
+            </div>
+          </div>
+          <div v-if="selected.prescriptionSummary" class="block">
+            <div class="bl">处方摘要</div>
+            <div class="bb">{{ selected.prescriptionSummary }}</div>
+          </div>
+        </div>
+        <div class="prev-ft">
+          <button class="btn btn-ghost" :disabled="busy" @click="onPrint">🖨 打印</button>
+          <button class="btn btn-ghost">复制为新病历模板</button>
+          <button v-if="!selected.signed" class="btn btn-primary" :disabled="busy" @click="onSign">🔏 CA 签名</button>
+          <button v-else class="btn btn-primary" @click="router.push('/p360')">🔁 复诊续方</button>
+        </div>
+      </div>
+    </div>
+  </section>
+  <PrintPreviewDialog v-model:visible="previewVisible" :title="previewTitle" :print-html="previewHtml" />
+</template>
+
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
@@ -135,105 +234,6 @@ onMounted(() => {
   void load()
 })
 </script>
-
-<template>
-  <section class="emr-page">
-    <div class="sec-hd">
-      <div class="page-title">📋 电子病历</div>
-      <input
-        v-model="keyword"
-        class="inp"
-        placeholder="🔍 姓名 + 手机号 / 档案号"
-        style="width: 260px"
-        @keydown.enter="onSearch"
-      />
-      <button class="btn btn-ghost btn-sm" @click="onSearch">搜索</button>
-      <div class="chip" :class="{ active: filter === 'all' }" @click="changeFilter('all')">全部</div>
-      <div class="chip" :class="{ active: filter === 'unsigned' }" @click="changeFilter('unsigned')">待签名</div>
-      <div class="chip" :class="{ active: filter === 'signed' }" @click="changeFilter('signed')">已签名</div>
-      <div class="chip" :class="{ active: filter === 'recent' }" @click="changeFilter('recent')">近 30 天 ▾</div>
-      <span class="tag tag-blue" style="margin-left: auto">共 {{ total }} 条</span>
-    </div>
-
-    <!-- 左右模块随视窗高度自适应，内部滚动 -->
-    <div class="grid2">
-      <!-- 左侧：病历列表（分页） -->
-      <div class="card left-card">
-        <div class="emr-list">
-          <div
-            v-for="r in records"
-            :key="r._id"
-            class="emr-item"
-            :class="{ sel: selected?._id === r._id }"
-            @click="selected = r"
-          >
-            <div class="ed">{{ fmt(r.visitedAt) }}<br /><small>{{ isToday(r.visitedAt) ? '今日' : '' }}</small></div>
-            <div class="tt" style="flex: 1; min-width: 0">
-              <b style="font-size: 13px">{{ r.patientName }} · {{ r.diagnosis[0]?.name ?? '—' }}</b>
-              <div style="font-size: 11.5px; color: var(--text-mute); margin-top: 1px">
-                {{ r.type === 'prescription' ? '处方' : r.type === 'admission' ? '入院记录' : '门诊病历' }} · {{ r.department }}
-              </div>
-            </div>
-            <span class="tag" :class="r.signed ? 'tag-green' : 'tag-orange'">{{ r.signed ? '已签名' : '待签名' }}</span>
-          </div>
-          <div v-if="records.length === 0" class="empty">暂无病历</div>
-        </div>
-        <Pagination :page="page" :total="total" :page-size="pageSize" @change="goPage" />
-      </div>
-
-      <!-- 右侧：病历预览（随高度滚动） -->
-      <div v-if="selected" class="card right-card">
-        <div class="prev-hd">
-          <b style="font-size: 15px">
-            {{ selected.type === 'prescription' ? '处方' : selected.type === 'admission' ? '入院记录' : '门诊病历' }} · {{ selected.patientName }}
-          </b>
-          <span class="tag tag-blue">{{ selected.recordNo }}</span>
-          <span class="tag" :class="selected.signed ? 'tag-green' : 'tag-orange'">
-            {{ selected.signed ? `🔏 已 CA 签名 ${selected.signedAt ? new Date(selected.signedAt).toLocaleString('zh-CN') : ''}` : '待签名' }}
-          </span>
-          <span style="margin-left: auto; font-size: 11.5px; color: var(--text-mute)">
-            {{ fmtFull(selected.visitedAt) }} · {{ selected.doctorName }} · {{ selected.department }}
-          </span>
-        </div>
-        <div class="prev-body">
-          <div v-if="selected.chiefComplaint" class="block">
-            <div class="bl">主诉</div>
-            <div class="bb">{{ selected.chiefComplaint }}</div>
-          </div>
-          <div v-if="selected.presentIllness" class="block">
-            <div class="bl">现病史</div>
-            <div class="bb">{{ selected.presentIllness }}</div>
-          </div>
-          <div v-if="selected.pastHistory" class="block">
-            <div class="bl">既往史</div>
-            <div class="bb">{{ selected.pastHistory }}</div>
-          </div>
-          <div v-if="selected.physicalExam" class="block">
-            <div class="bl">体格检查</div>
-            <div class="bb">{{ selected.physicalExam }}</div>
-          </div>
-          <div v-if="selected.diagnosis.length > 0" class="block hl">
-            <div class="bl">诊断</div>
-            <div class="bb" style="font-weight: 600">
-              <div v-for="d in selected.diagnosis" :key="d.code">{{ d.code }} {{ d.name }}</div>
-            </div>
-          </div>
-          <div v-if="selected.prescriptionSummary" class="block">
-            <div class="bl">处方摘要</div>
-            <div class="bb">{{ selected.prescriptionSummary }}</div>
-          </div>
-        </div>
-        <div class="prev-ft">
-          <button class="btn btn-ghost" :disabled="busy" @click="onPrint">🖨 打印</button>
-          <button class="btn btn-ghost">复制为新病历模板</button>
-          <button v-if="!selected.signed" class="btn btn-primary" :disabled="busy" @click="onSign">🔏 CA 签名</button>
-          <button v-else class="btn btn-primary" @click="router.push('/p360')">🔁 复诊续方</button>
-        </div>
-      </div>
-    </div>
-  </section>
-  <PrintPreviewDialog v-model:visible="previewVisible" :title="previewTitle" :print-html="previewHtml" />
-</template>
 
 <style scoped>
 .emr-page {

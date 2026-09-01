@@ -1,3 +1,89 @@
+<template>
+  <section>
+    <div class="sec-hd">
+      <div class="page-title">🤝 会诊管理</div>
+      <div class="chip" :class="{ active: filter === 'all' }" @click="filter = 'all'">全部</div>
+      <div class="chip" :class="{ active: filter === 'pending' }" @click="filter = 'pending'">
+        待我响应 <span style="color: var(--red); font-weight: 700">{{ pending }}</span>
+      </div>
+      <div class="chip" :class="{ active: filter === 'mine' }" @click="filter = 'mine'">我发起的</div>
+      <div style="margin-left: auto; display: flex; gap: 8px">
+        <span class="tag tag-red">待响应 {{ pending }}</span>
+        <span class="tag tag-blue">进行中 {{ active }}</span>
+        <span class="tag tag-green">今日完成 {{ completed }}</span>
+      </div>
+    </div>
+    <div class="grid2">
+      <div>
+        <div v-for="c in filtered" :key="c._id" class="card hover consult-card">
+          <div class="cc-hd">
+            <span class="tag" :class="c.type === 'urgent' ? 'tag-red' : c.status === 'accepted' ? 'tag-blue' : 'tag-orange'">
+              {{ c.type === 'urgent' ? '⚡ 急会诊' : c.status === 'accepted' ? '进行中' : '普通会诊' }}
+            </span>
+            <b>{{ c.patientName }}</b>
+            <span class="tag tag-blue">{{ c.patientRef }}</span>
+            <span style="margin-left: auto; font-size: 11.5px; color: var(--text-mute)">
+              {{ timeAgo(c.createdAt) }} · 已催办 {{ c.urgeCount }} 次
+            </span>
+          </div>
+          <div class="cc-route">
+            <span class="dept">{{ c.fromDept }}（发起）</span>→
+            <span class="dept" style="border-color: var(--primary); color: var(--primary)">{{ c.toDept }}</span>
+          </div>
+          <div class="cc-desc">{{ c.summary }}</div>
+          <div class="cc-ft">
+            <button v-if="c.status === 'pending'" class="btn btn-primary btn-sm" :disabled="busy" @click="onRespond(c)">
+              立即响应
+            </button>
+            <button v-else class="btn btn-ghost btn-sm">查看进度</button>
+            <button class="btn btn-ghost btn-sm">查看病历摘要</button>
+            <button v-if="c.status === 'pending'" class="btn btn-ghost btn-sm" :disabled="busy" @click="onUrge(c)">
+              ⏰ 催办
+            </button>
+          </div>
+        </div>
+      </div>
+      <!-- 发起会诊 -->
+      <div class="card" style="padding: 18px">
+        <div style="font-size: 14px; font-weight: 700; margin-bottom: 4px">＋ 发起会诊</div>
+        <div style="font-size: 11.5px; color: var(--text-mute); margin-bottom: 13px">提交即 CA 签名，写入审计日志</div>
+        <div class="qs-form">
+          <div class="search-row">
+            <input
+              v-model="form.patientKw"
+              class="inp search-inp"
+              placeholder="🔍 患者：姓名 + 手机号调档"
+              @keydown.enter="onPatientSearch"
+            />
+            <button class="btn btn-ghost btn-sm search-btn" @click="onPatientSearch">搜索</button>
+          </div>
+          <div v-for="p in patientHits" :key="p._id" class="qs-result" @click="selectedPatient = p; patientHits = []">
+            <b style="font-size: 13px">{{ p.name }}</b>
+            <span style="font-size: 11.5px; color: var(--text-mute)">{{ p.gender }} · {{ p.phone }}</span>
+          </div>
+          <div v-if="selectedPatient" class="sel-patient">已选：{{ selectedPatient.name }}</div>
+          <HisSelect
+            v-model="form.toDept"
+            :options="depts.map((d) => ({ value: d.name, label: d.name }))"
+            placeholder="会诊科室"
+          />
+          <HisSelect
+            v-model="form.type"
+            :options="[
+              { value: 'normal', label: '普通会诊（24h 内响应）' },
+              { value: 'urgent', label: '⚡ 急会诊（10 分钟内响应）' }
+            ]"
+            placeholder="会诊类型"
+          />
+          <textarea v-model="form.summary" class="inp" placeholder="会诊事由与病情摘要…" style="min-height: 76px"></textarea>
+          <div v-if="errorMsg" style="font-size: 12px; color: var(--red)">{{ errorMsg }}</div>
+          <button class="btn btn-primary" :disabled="busy" @click="onSubmit">🔏 签名并提交申请</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</template>
+
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { createConsultation, listConsultations, respondConsultation, urgeConsultation } from '@/api/consultations'
@@ -111,92 +197,6 @@ onMounted(async () => {
   depts.value = await listDictionaries('department')
 })
 </script>
-
-<template>
-  <section>
-    <div class="sec-hd">
-      <div class="page-title">🤝 会诊管理</div>
-      <div class="chip" :class="{ active: filter === 'all' }" @click="filter = 'all'">全部</div>
-      <div class="chip" :class="{ active: filter === 'pending' }" @click="filter = 'pending'">
-        待我响应 <span style="color: var(--red); font-weight: 700">{{ pending }}</span>
-      </div>
-      <div class="chip" :class="{ active: filter === 'mine' }" @click="filter = 'mine'">我发起的</div>
-      <div style="margin-left: auto; display: flex; gap: 8px">
-        <span class="tag tag-red">待响应 {{ pending }}</span>
-        <span class="tag tag-blue">进行中 {{ active }}</span>
-        <span class="tag tag-green">今日完成 {{ completed }}</span>
-      </div>
-    </div>
-    <div class="grid2">
-      <div>
-        <div v-for="c in filtered" :key="c._id" class="card hover consult-card">
-          <div class="cc-hd">
-            <span class="tag" :class="c.type === 'urgent' ? 'tag-red' : c.status === 'accepted' ? 'tag-blue' : 'tag-orange'">
-              {{ c.type === 'urgent' ? '⚡ 急会诊' : c.status === 'accepted' ? '进行中' : '普通会诊' }}
-            </span>
-            <b>{{ c.patientName }}</b>
-            <span class="tag tag-blue">{{ c.patientRef }}</span>
-            <span style="margin-left: auto; font-size: 11.5px; color: var(--text-mute)">
-              {{ timeAgo(c.createdAt) }} · 已催办 {{ c.urgeCount }} 次
-            </span>
-          </div>
-          <div class="cc-route">
-            <span class="dept">{{ c.fromDept }}（发起）</span>→
-            <span class="dept" style="border-color: var(--primary); color: var(--primary)">{{ c.toDept }}</span>
-          </div>
-          <div class="cc-desc">{{ c.summary }}</div>
-          <div class="cc-ft">
-            <button v-if="c.status === 'pending'" class="btn btn-primary btn-sm" :disabled="busy" @click="onRespond(c)">
-              立即响应
-            </button>
-            <button v-else class="btn btn-ghost btn-sm">查看进度</button>
-            <button class="btn btn-ghost btn-sm">查看病历摘要</button>
-            <button v-if="c.status === 'pending'" class="btn btn-ghost btn-sm" :disabled="busy" @click="onUrge(c)">
-              ⏰ 催办
-            </button>
-          </div>
-        </div>
-      </div>
-      <!-- 发起会诊 -->
-      <div class="card" style="padding: 18px">
-        <div style="font-size: 14px; font-weight: 700; margin-bottom: 4px">＋ 发起会诊</div>
-        <div style="font-size: 11.5px; color: var(--text-mute); margin-bottom: 13px">提交即 CA 签名，写入审计日志</div>
-        <div class="qs-form">
-          <div class="search-row">
-            <input
-              v-model="form.patientKw"
-              class="inp search-inp"
-              placeholder="🔍 患者：姓名 + 手机号调档"
-              @keydown.enter="onPatientSearch"
-            />
-            <button class="btn btn-ghost btn-sm search-btn" @click="onPatientSearch">搜索</button>
-          </div>
-          <div v-for="p in patientHits" :key="p._id" class="qs-result" @click="selectedPatient = p; patientHits = []">
-            <b style="font-size: 13px">{{ p.name }}</b>
-            <span style="font-size: 11.5px; color: var(--text-mute)">{{ p.gender }} · {{ p.phone }}</span>
-          </div>
-          <div v-if="selectedPatient" class="sel-patient">已选：{{ selectedPatient.name }}</div>
-          <HisSelect
-            v-model="form.toDept"
-            :options="depts.map((d) => ({ value: d.name, label: d.name }))"
-            placeholder="会诊科室"
-          />
-          <HisSelect
-            v-model="form.type"
-            :options="[
-              { value: 'normal', label: '普通会诊（24h 内响应）' },
-              { value: 'urgent', label: '⚡ 急会诊（10 分钟内响应）' }
-            ]"
-            placeholder="会诊类型"
-          />
-          <textarea v-model="form.summary" class="inp" placeholder="会诊事由与病情摘要…" style="min-height: 76px"></textarea>
-          <div v-if="errorMsg" style="font-size: 12px; color: var(--red)">{{ errorMsg }}</div>
-          <button class="btn btn-primary" :disabled="busy" @click="onSubmit">🔏 签名并提交申请</button>
-        </div>
-      </div>
-    </div>
-  </section>
-</template>
 
 <style scoped>
 .grid2 {

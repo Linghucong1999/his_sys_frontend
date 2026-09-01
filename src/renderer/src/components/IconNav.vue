@@ -1,3 +1,28 @@
+<template>
+  <nav class="iconnav">
+    <div class="logo">✚</div>
+    <div
+      v-for="n in navs"
+      :key="n.view"
+      class="inav"
+      :class="{ active: route.path.startsWith('/' + n.view) }"
+      @click="go(n.view)"
+    >
+      {{ n.icon }}
+      <span class="tip">{{ n.tip }}</span>
+      <span v-if="n.view === 'consultations'" class="dot">2</span>
+    </div>
+    <div class="inav" title="患者主索引 EMPI（建设中）">🪪<span class="tip">患者主索引 EMPI</span></div>
+    <div class="bottom">
+      <div class="inav" @click="toggleDark()">
+        {{ isDark ? '☀️' : '🌙' }}
+        <span class="tip">{{ isDark ? '切换浅色模式' : '切换深色模式' }}</span>
+      </div>
+      <div class="inav" title="系统设置（建设中）">⚙️<span class="tip">系统设置</span></div>
+    </div>
+  </nav>
+</template>
+
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
 import { useDark, useToggle } from '@vueuse/core'
@@ -25,31 +50,6 @@ function go(view: string): void {
   router.push('/' + view)
 }
 </script>
-
-<template>
-  <nav class="iconnav">
-    <div class="logo">✚</div>
-    <div
-      v-for="n in navs"
-      :key="n.view"
-      class="inav"
-      :class="{ active: route.path.startsWith('/' + n.view) }"
-      @click="go(n.view)"
-    >
-      {{ n.icon }}
-      <span class="tip">{{ n.tip }}</span>
-      <span v-if="n.view === 'consultations'" class="dot">2</span>
-    </div>
-    <div class="inav" title="患者主索引 EMPI（建设中）">🪪<span class="tip">患者主索引 EMPI</span></div>
-    <div class="bottom">
-      <div class="inav" @click="toggleDark()">
-        {{ isDark ? '☀️' : '🌙' }}
-        <span class="tip">{{ isDark ? '切换浅色模式' : '切换深色模式' }}</span>
-      </div>
-      <div class="inav" title="系统设置（建设中）">⚙️<span class="tip">系统设置</span></div>
-    </div>
-  </nav>
-</template>
 
 <style scoped>
 .iconnav {

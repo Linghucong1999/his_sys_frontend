@@ -5,6 +5,7 @@ import { useUserStore } from '@/stores/user'
 import { useTodoStore } from '@/stores/todo'
 import StatCard from '@/components/StatCard.vue'
 import QuickStartCard from '@/components/QuickStartCard.vue'
+import PaginatedList from '@/components/PaginatedList.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -29,6 +30,19 @@ onMounted(() => {
 
 function go(view: string): void {
   router.push('/' + view)
+}
+
+/** 待办事项跳转：签名→EMR 待签名列表；处方/病历未完成→患者 360；会诊→会诊管理 */
+function goTodo(kind: string): void {
+  if (kind === 'sign') {
+    router.push({ path: '/emr', query: { filter: 'unsigned' } })
+  } else if (kind === 'rx' || kind === 'emr') {
+    router.push('/p360')
+  } else if (kind === 'consult') {
+    router.push('/consultations')
+  } else {
+    router.push('/inpatient')
+  }
 }
 </script>
 
@@ -99,16 +113,26 @@ function go(view: string): void {
 
       <div class="card todo">
         <h3>📌 待办聚合</h3>
-        <div v-for="t in todoStore.todos" :key="t.id" class="todo-item" @click="t.kind === 'sign' ? go('emr') : t.kind === 'consult' ? go('consultations') : go('inpatient')">
-          <div class="tic" :style="t.kind === 'sign' ? 'background:rgba(108,92,231,.12);color:var(--violet)' : t.kind === 'consult' ? 'background:var(--red-bg);color:var(--red)' : 'background:var(--orange-bg);color:var(--orange)'">
-            {{ t.icon }}
-          </div>
-          <div class="tt">
-            <b>{{ t.title }}</b>
-            <small>{{ t.sub }}</small>
-          </div>
-          <span class="arr">›</span>
-        </div>
+        <PaginatedList :items="todoStore.todos" :item-height="52" :reserved-height="118" :min-per-page="2">
+          <template #item="{ item }">
+            <div class="todo-item" @click="goTodo(item.kind)">
+              <div
+                class="tic"
+                :style="item.kind === 'sign' ? 'background:rgba(108,92,231,.12);color:var(--violet)' : item.kind === 'rx' ? 'background:var(--orange-bg);color:var(--orange)' : 'background:var(--green-bg);color:var(--green)'"
+              >
+                {{ item.icon }}
+              </div>
+              <div class="tt">
+                <b>{{ item.title }}</b>
+                <small>{{ item.sub }}</small>
+              </div>
+              <span class="arr">›</span>
+            </div>
+          </template>
+          <template #empty>
+            <div class="todo-empty">暂无待办事项 🎉</div>
+          </template>
+        </PaginatedList>
       </div>
     </div>
 
@@ -165,7 +189,7 @@ function go(view: string): void {
   display: grid;
   grid-template-columns: 1.6fr 1fr;
   gap: 14px;
-  align-items: start;
+  align-items: stretch;
 }
 .now-patient {
   padding: 22px;
@@ -194,6 +218,9 @@ function go(view: string): void {
 }
 .todo {
   padding: 18px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .todo h3 {
   font-size: 14px;
@@ -202,6 +229,7 @@ function go(view: string): void {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
 }
 .todo-item {
   display: flex;
@@ -241,6 +269,12 @@ function go(view: string): void {
 .arr {
   color: var(--text-mute);
   font-size: 14px;
+}
+.todo-empty {
+  padding: 18px;
+  text-align: center;
+  color: var(--text-mute);
+  font-size: 12.5px;
 }
 .quick {
   display: grid;

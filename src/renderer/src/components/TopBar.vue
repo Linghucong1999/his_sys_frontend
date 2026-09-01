@@ -31,6 +31,7 @@ function goSigning(): void {
 function goTodo(kind: string): void {
   notifyOpen.value = false
   if (kind === 'sign') router.push({ path: '/emr', query: { filter: 'unsigned' } })
+  else if (kind === 'rx' || kind === 'emr') router.push('/p360')
   else if (kind === 'consult') router.push('/consultations')
   else router.push('/inpatient')
 }

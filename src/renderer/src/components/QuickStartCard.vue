@@ -1,3 +1,65 @@
+<template>
+  <div class="qs-grid">
+    <!-- 左：新建首诊 -->
+    <div>
+      <div class="qs-title">🆕 新建首诊</div>
+      <div class="qs-desc">首次就诊患者，医师直接创建档案与首诊病历</div>
+      <div class="qs-form">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
+          <input v-model="firstForm.name" class="inp" placeholder="患者姓名" />
+          <input v-model="firstForm.phone" class="inp" placeholder="手机号" />
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
+          <HisSelect
+            v-model="firstForm.gender"
+            :options="GENDER_OPTIONS"
+            placeholder="性别"
+          />
+          <input v-model="firstForm.age" class="inp" placeholder="年龄" />
+        </div>
+        <HisSelect
+          v-model="firstForm.insuranceType"
+          :options="INSURANCE_OPTIONS"
+          placeholder="医保类型（市职工 / 城乡居民 / 新农合 / 商业保险 / 自费）"
+        />
+        <input v-model="firstForm.address" class="inp" placeholder="住址（常住地址）" />
+        <textarea v-model="firstForm.chiefComplaint" class="inp" placeholder="主诉（一句话）"></textarea>
+        <button class="btn btn-primary" :disabled="loading" @click="onFirstVisit">创建档案并接诊 →</button>
+      </div>
+    </div>
+    <!-- 右：复诊调档 -->
+    <div style="border-left: 1px dashed var(--border-strong); padding-left: 20px">
+      <div class="qs-title">🔁 复诊调档</div>
+      <div class="qs-desc">已就诊过的患者，姓名 + 手机号调档，直接续方</div>
+      <div class="search-row">
+        <input
+          v-model="searchKw"
+          class="inp search-inp"
+          placeholder="🔍 姓名 + 手机号，如：张丽华 138****2671"
+          @keydown.enter="onSearch"
+        />
+        <button class="btn btn-ghost search-btn" :disabled="searchLoading" @click="onSearch">搜索</button>
+      </div>
+      <div v-for="p in patientStore.searchResults.slice(0, 2)" :key="p._id" class="qs-result">
+        <div class="ava">{{ p.name[0] }}</div>
+        <div style="flex: 1; min-width: 0">
+          <b style="font-size: 13.5px">{{ p.name }}</b>
+          <span style="color: var(--text-mute); font-size: 11.5px">
+            {{ p.gender ?? '未知' }} · {{ p.phone ?? '' }}
+          </span>
+          <div style="font-size: 11.5px; color: var(--text-mute); margin-top: 2px">
+            档案号 {{ p.medicalRecordNo ?? p.empiId }}
+          </div>
+        </div>
+        <button class="btn btn-primary btn-sm" @click="onFollowup(p)">调档接诊</button>
+      </div>
+      <div v-if="patientStore.searchResults.length === 0" style="font-size: 11.5px; color: var(--text-mute)">
+        💡 调档后自动带入上次诊断与历史处方，一键复制续方
+      </div>
+    </div>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { reactive, ref, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
@@ -99,68 +161,6 @@ onBeforeUnmount(() => {
   if (searchTimer) clearTimeout(searchTimer)
 })
 </script>
-
-<template>
-  <div class="qs-grid">
-    <!-- 左：新建首诊 -->
-    <div>
-      <div class="qs-title">🆕 新建首诊</div>
-      <div class="qs-desc">首次就诊患者，医师直接创建档案与首诊病历</div>
-      <div class="qs-form">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
-          <input v-model="firstForm.name" class="inp" placeholder="患者姓名" />
-          <input v-model="firstForm.phone" class="inp" placeholder="手机号" />
-        </div>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
-          <HisSelect
-            v-model="firstForm.gender"
-            :options="GENDER_OPTIONS"
-            placeholder="性别"
-          />
-          <input v-model="firstForm.age" class="inp" placeholder="年龄" />
-        </div>
-        <HisSelect
-          v-model="firstForm.insuranceType"
-          :options="INSURANCE_OPTIONS"
-          placeholder="医保类型（市职工 / 城乡居民 / 新农合 / 商业保险 / 自费）"
-        />
-        <input v-model="firstForm.address" class="inp" placeholder="住址（常住地址）" />
-        <textarea v-model="firstForm.chiefComplaint" class="inp" placeholder="主诉（一句话）"></textarea>
-        <button class="btn btn-primary" :disabled="loading" @click="onFirstVisit">创建档案并接诊 →</button>
-      </div>
-    </div>
-    <!-- 右：复诊调档 -->
-    <div style="border-left: 1px dashed var(--border-strong); padding-left: 20px">
-      <div class="qs-title">🔁 复诊调档</div>
-      <div class="qs-desc">已就诊过的患者，姓名 + 手机号调档，直接续方</div>
-      <div class="search-row">
-        <input
-          v-model="searchKw"
-          class="inp search-inp"
-          placeholder="🔍 姓名 + 手机号，如：张丽华 138****2671"
-          @keydown.enter="onSearch"
-        />
-        <button class="btn btn-ghost search-btn" :disabled="searchLoading" @click="onSearch">搜索</button>
-      </div>
-      <div v-for="p in patientStore.searchResults.slice(0, 2)" :key="p._id" class="qs-result">
-        <div class="ava">{{ p.name[0] }}</div>
-        <div style="flex: 1; min-width: 0">
-          <b style="font-size: 13.5px">{{ p.name }}</b>
-          <span style="color: var(--text-mute); font-size: 11.5px">
-            {{ p.gender ?? '未知' }} · {{ p.phone ?? '' }}
-          </span>
-          <div style="font-size: 11.5px; color: var(--text-mute); margin-top: 2px">
-            档案号 {{ p.medicalRecordNo ?? p.empiId }}
-          </div>
-        </div>
-        <button class="btn btn-primary btn-sm" @click="onFollowup(p)">调档接诊</button>
-      </div>
-      <div v-if="patientStore.searchResults.length === 0" style="font-size: 11.5px; color: var(--text-mute)">
-        💡 调档后自动带入上次诊断与历史处方，一键复制续方
-      </div>
-    </div>
-  </div>
-</template>
 
 <style scoped>
 .qs-grid {

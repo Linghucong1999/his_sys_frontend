@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { onClickOutside } from '@vueuse/core'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 export interface SelectOption {
   value: string
@@ -19,7 +18,50 @@ const emit = defineEmits<{ (e: 'update:modelValue', v: string): void }>()
 
 const open = ref(false)
 const wrapRef = ref<HTMLElement>()
-onClickOutside(wrapRef, () => (open.value = false))
+const panelRef = ref<HTMLElement>()
+
+/** 点击触发器/面板以外区域时关闭（面板 Teleport 到 body，需同时判定两者） */
+function onDocPointerDown(e: PointerEvent): void {
+  const t = e.target as Node
+  if (wrapRef.value?.contains(t) || panelRef.value?.contains(t)) return
+  open.value = false
+}
+
+/** 面板 Teleport 到 body 后按触发器位置 fixed 定位，避免被卡片 overflow 裁剪 */
+const panelStyle = ref<{ top: string; left: string; width: string }>({
+  top: '0px',
+  left: '0px',
+  width: '0px'
+})
+
+function toggle(): void {
+  if (!open.value) {
+    const rect = wrapRef.value?.getBoundingClientRect()
+    if (rect) {
+      panelStyle.value = {
+        top: `${rect.bottom + 6}px`,
+        left: `${rect.left}px`,
+        width: `${rect.width}px`
+      }
+    }
+  }
+  open.value = !open.value
+}
+
+function closeOnScroll(): void {
+  open.value = false
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', onDocPointerDown)
+  window.addEventListener('scroll', closeOnScroll, true)
+  window.addEventListener('resize', closeOnScroll)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onDocPointerDown)
+  window.removeEventListener('scroll', closeOnScroll, true)
+  window.removeEventListener('resize', closeOnScroll)
+})
 
 const currentLabel = computed(() => {
   const opt = props.options.find((o) => o.value === props.modelValue)
@@ -37,25 +79,27 @@ function select(v: string): void {
     <div
       class="select-trigger"
       :class="{ placeholder: !modelValue }"
-      @click="open = !open"
+      @click="toggle"
     >
       <span class="select-text">{{ modelValue ? currentLabel : placeholder }}</span>
       <span class="select-arrow" :class="{ open }"></span>
     </div>
-    <Transition name="fade-up">
-      <div v-if="open" class="select-panel">
-        <div
-          v-for="o in options"
-          :key="o.value"
-          class="select-item"
-          :class="{ sel: o.value === modelValue }"
-          @click="select(o.value)"
-        >
-          {{ o.label }}
+    <Teleport to="body">
+      <Transition name="fade-up">
+        <div v-if="open" ref="panelRef" class="select-panel" :style="panelStyle">
+          <div
+            v-for="o in options"
+            :key="o.value"
+            class="select-item"
+            :class="{ sel: o.value === modelValue }"
+            @click="select(o.value)"
+          >
+            {{ o.label }}
+          </div>
+          <div v-if="options.length === 0" class="select-empty">暂无选项</div>
         </div>
-        <div v-if="options.length === 0" class="select-empty">暂无选项</div>
-      </div>
-    </Transition>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -109,17 +153,14 @@ function select(v: string): void {
   transform: translateY(-50%) rotate(180deg);
 }
 .select-panel {
-  position: absolute;
-  top: 42px;
-  left: 0;
-  right: 0;
+  position: fixed;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: var(--shadow-lg);
   padding: 6px;
-  z-index: 60;
-  max-height: 260px;
+  z-index: 200;
+  max-height: 220px;
   overflow-y: auto;
 }
 .select-item {

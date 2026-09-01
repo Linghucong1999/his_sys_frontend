@@ -1,6 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { onClickOutside } from '@vueuse/core'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 export interface ComboboxOption {
   value: string
@@ -20,7 +19,46 @@ const emit = defineEmits<{ (e: 'update:modelValue', v: string): void }>()
 const open = ref(false)
 const wrapRef = ref<HTMLElement>()
 const inputRef = ref<HTMLInputElement>()
-onClickOutside(wrapRef, () => (open.value = false))
+const panelRef = ref<HTMLElement>()
+
+/** 面板 Teleport 到 body 后按触发器位置 fixed 定位，避免被卡片 overflow 裁剪 */
+const panelStyle = ref<{ top: string; left: string; width: string }>({
+  top: '0px',
+  left: '0px',
+  width: '0px'
+})
+
+function positionPanel(): void {
+  const rect = wrapRef.value?.getBoundingClientRect()
+  if (rect) {
+    panelStyle.value = {
+      top: `${rect.bottom + 6}px`,
+      left: `${rect.left}px`,
+      width: `${rect.width}px`
+    }
+  }
+}
+
+function onDocPointerDown(e: PointerEvent): void {
+  const t = e.target as Node
+  if (wrapRef.value?.contains(t) || panelRef.value?.contains(t)) return
+  open.value = false
+}
+
+function closeOnScroll(): void {
+  open.value = false
+}
+
+onMounted(() => {
+  document.addEventListener('pointerdown', onDocPointerDown)
+  window.addEventListener('scroll', closeOnScroll, true)
+  window.addEventListener('resize', closeOnScroll)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', onDocPointerDown)
+  window.removeEventListener('scroll', closeOnScroll, true)
+  window.removeEventListener('resize', closeOnScroll)
+})
 
 /** 当前正在编辑的片段（最后一个分号之后） */
 const currentSegment = computed(() => {
@@ -39,6 +77,7 @@ const filtered = computed(() => {
 function onInput(v: string): void {
   emit('update:modelValue', v)
   open.value = true
+  positionPanel()
 }
 
 /** 选中选项：替换正在编辑的片段（多诊断自动以「；」分隔追加） */
@@ -48,7 +87,6 @@ function pick(opt: ComboboxOption): void {
   if (segs.length === 0) {
     emit('update:modelValue', full)
   } else {
-    // 去掉未完成的末段，追加选中项
     const done = segs.slice(0, -1)
     emit('update:modelValue', [...done, full].join('；'))
   }
@@ -65,22 +103,24 @@ function pick(opt: ComboboxOption): void {
       :value="modelValue"
       :placeholder="placeholder"
       @input="onInput(($event.target as HTMLInputElement).value)"
-      @focus="open = true"
+      @focus="positionPanel(); open = true"
       @keydown.escape="open = false"
     />
-    <Transition name="fade-up">
-      <div v-if="open && filtered.length > 0" class="combo-panel">
-        <div
-          v-for="o in filtered"
-          :key="o.value"
-          class="combo-item"
-          @mousedown.prevent="pick(o)"
-        >
-          <span class="combo-code">{{ o.value }}</span>
-          <span class="combo-label">{{ o.label }}</span>
+    <Teleport to="body">
+      <Transition name="fade-up">
+        <div v-if="open && filtered.length > 0" ref="panelRef" class="combo-panel" :style="panelStyle">
+          <div
+            v-for="o in filtered"
+            :key="o.value"
+            class="combo-item"
+            @mousedown.prevent="pick(o)"
+          >
+            <span class="combo-code">{{ o.value }}</span>
+            <span class="combo-label">{{ o.label }}</span>
+          </div>
         </div>
-      </div>
-    </Transition>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -110,16 +150,13 @@ function pick(opt: ComboboxOption): void {
   color: var(--text-mute);
 }
 .combo-panel {
-  position: absolute;
-  top: 42px;
-  left: 0;
-  right: 0;
+  position: fixed;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 12px;
   box-shadow: var(--shadow-lg);
   padding: 6px;
-  z-index: 60;
+  z-index: 200;
   max-height: 240px;
   overflow-y: auto;
 }

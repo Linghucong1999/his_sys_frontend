@@ -48,6 +48,7 @@ export interface MedicalRecord {
   physicalExam?: string
   diagnosis: DiagnosisItem[]
   prescriptionSummary?: string
+  examRequest?: string
   signed: boolean
   signedAt?: string
   signedBy?: string
@@ -121,7 +122,7 @@ export interface TodoItem {
   icon: string
   title: string
   sub: string
-  kind: 'sign' | 'consult' | 'report'
+  kind: 'sign' | 'rx' | 'emr' | 'consult' | 'report'
   ref?: string
 }
 

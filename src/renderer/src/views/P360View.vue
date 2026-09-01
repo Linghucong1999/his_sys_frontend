@@ -15,6 +15,7 @@ import { buildRecordPrintHtml } from '@/utils/print'
 import PrintPreviewDialog from '@/components/PrintPreviewDialog.vue'
 import HisCombobox from '@/components/HisCombobox.vue'
 import Pagination from '@/components/Pagination.vue'
+import AutoTextarea from '@/components/AutoTextarea.vue'
 
 const router = useRouter()
 const patientStore = usePatientStore()
@@ -31,7 +32,8 @@ const form = ref({
   pastHistory: '',
   physicalExam: '',
   diagnosisText: '',
-  prescriptionSummary: ''
+  prescriptionSummary: '',
+  examRequest: ''
 })
 
 const icdOptions = ref<Array<{ code: string; name: string }>>([])
@@ -74,7 +76,8 @@ async function loadRecord(): Promise<void> {
       pastHistory: latest.pastHistory ?? '',
       physicalExam: latest.physicalExam ?? '',
       diagnosisText: latest.diagnosis?.map((d) => `${d.code} ${d.name}`).join('；') ?? '',
-      prescriptionSummary: latest.prescriptionSummary ?? ''
+      prescriptionSummary: latest.prescriptionSummary ?? '',
+      examRequest: latest.examRequest ?? ''
     }
   }
 }
@@ -105,7 +108,8 @@ async function onSave(): Promise<void> {
       pastHistory: form.value.pastHistory,
       physicalExam: form.value.physicalExam,
       diagnosis: parseDiagnosis(form.value.diagnosisText),
-      prescriptionSummary: form.value.prescriptionSummary
+      prescriptionSummary: form.value.prescriptionSummary,
+      examRequest: form.value.examRequest
     }
     if (currentRecord.value && !currentRecord.value.signed) {
       currentRecord.value = await saveRecord(payload).then(() => currentRecord.value)
@@ -128,6 +132,15 @@ async function onSign(): Promise<void> {
     await onSave()
   }
   if (!currentRecord.value) return
+  // CA 签名前置条件：门诊病历 / 处方 / 检查申请 三者缺一不可
+  const missing: string[] = []
+  if (!form.value.chiefComplaint.trim()) missing.push('门诊病历（主诉未填写）')
+  if (!form.value.prescriptionSummary.trim()) missing.push('处方')
+  if (!form.value.examRequest.trim()) missing.push('检查申请')
+  if (missing.length > 0) {
+    errorMsg.value = `以下内容未完成，不可 CA 签名：${missing.join('、')}`
+    return
+  }
   busy.value = true
   try {
     currentRecord.value = await signRecord(currentRecord.value._id)
@@ -160,6 +173,7 @@ function onPrint(): void {
     pastHistory: form.value.pastHistory,
     physicalExam: form.value.physicalExam,
     prescriptionSummary: form.value.prescriptionSummary,
+    examRequest: form.value.examRequest,
     signed: signed.value,
     signedBy: currentRecord.value?.signedBy,
     signedAt: currentRecord.value?.signedAt
@@ -256,17 +270,17 @@ watch(() => patientStore.current, () => void loadRecord())
         </div>
 
         <EmrBlock v-if="tab === 'record'" label="主诉" ai="✨ AI 生成">
-          <textarea v-model="form.chiefComplaint" class="inp plain" placeholder="主诉…"></textarea>
+          <AutoTextarea v-model="form.chiefComplaint" placeholder="主诉…" />
         </EmrBlock>
         <EmrBlock v-if="tab === 'record'" label="现病史" ai="✨ 语音转写">
-          <textarea v-model="form.presentIllness" class="inp plain" placeholder="现病史…"></textarea>
+          <AutoTextarea v-model="form.presentIllness" placeholder="现病史…" />
         </EmrBlock>
         <div v-if="tab === 'record'" class="two-col">
           <EmrBlock label="既往史">
-            <textarea v-model="form.pastHistory" class="inp plain" placeholder="既往史…"></textarea>
+            <AutoTextarea v-model="form.pastHistory" placeholder="既往史…" />
           </EmrBlock>
           <EmrBlock label="体格检查">
-            <textarea v-model="form.physicalExam" class="inp plain" placeholder="体格检查…"></textarea>
+            <AutoTextarea v-model="form.physicalExam" placeholder="体格检查…" />
           </EmrBlock>
         </div>
         <EmrBlock v-if="tab === 'record'" label="初步诊断" ai="ICD-10 智能匹配" highlight>
@@ -277,10 +291,10 @@ watch(() => patientStore.current, () => void loadRecord())
           />
         </EmrBlock>
         <EmrBlock v-if="tab === 'prescription'" label="处方内容" ai="用药安全校验">
-          <textarea v-model="form.prescriptionSummary" class="inp plain" placeholder="处方内容…"></textarea>
+          <AutoTextarea v-model="form.prescriptionSummary" placeholder="处方内容…" />
         </EmrBlock>
         <EmrBlock v-if="tab === 'exam'" label="检查申请">
-          <textarea class="inp plain" placeholder="检查项目与临床指征（第一版占位）"></textarea>
+          <AutoTextarea v-model="form.examRequest" placeholder="检查项目与临床指征（CA 签名前必填）" />
         </EmrBlock>
 
         <div v-if="errorMsg" class="err">{{ errorMsg }}</div>

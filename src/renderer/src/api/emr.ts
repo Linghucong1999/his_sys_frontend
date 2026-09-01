@@ -13,6 +13,7 @@ export interface SaveRecordInput {
   physicalExam?: string
   diagnosis?: DiagnosisItem[]
   prescriptionSummary?: string
+  examRequest?: string
 }
 
 export function listRecords(params?: {

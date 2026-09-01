@@ -7,6 +7,7 @@ export interface CreatePatientInput {
   age?: number
   phone?: string
   address?: string
+  insuranceType?: string
 }
 
 export function createPatient(data: CreatePatientInput): Promise<Patient> {

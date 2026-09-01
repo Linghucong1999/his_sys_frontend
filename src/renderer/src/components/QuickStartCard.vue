@@ -10,6 +10,14 @@ const GENDER_OPTIONS = [
   { value: '男', label: '男' }
 ]
 
+const INSURANCE_OPTIONS = [
+  { value: '市职工医保', label: '市职工医保' },
+  { value: '城乡居民医保', label: '城乡居民医保' },
+  { value: '新农合', label: '新农合' },
+  { value: '商业保险', label: '商业保险' },
+  { value: '自费', label: '自费' }
+]
+
 const router = useRouter()
 const patientStore = usePatientStore()
 const loading = ref(false)
@@ -18,6 +26,7 @@ const firstForm = reactive({
   name: '',
   phone: '',
   gender: '',
+  insuranceType: '',
   age: '',
   address: '',
   chiefComplaint: ''
@@ -37,6 +46,7 @@ async function onFirstVisit(): Promise<void> {
       name: firstForm.name.trim(),
       phone: firstForm.phone.trim() || undefined,
       gender: firstForm.gender || undefined,
+      insuranceType: firstForm.insuranceType || undefined,
       age: firstForm.age ? Number(firstForm.age) : undefined,
       address: firstForm.address.trim() || undefined,
       chiefComplaint: firstForm.chiefComplaint.trim() || undefined
@@ -109,6 +119,11 @@ onBeforeUnmount(() => {
           />
           <input v-model="firstForm.age" class="inp" placeholder="年龄" />
         </div>
+        <HisSelect
+          v-model="firstForm.insuranceType"
+          :options="INSURANCE_OPTIONS"
+          placeholder="医保类型（市职工 / 城乡居民 / 新农合 / 商业保险 / 自费）"
+        />
         <input v-model="firstForm.address" class="inp" placeholder="住址（常住地址）" />
         <textarea v-model="firstForm.chiefComplaint" class="inp" placeholder="主诉（一句话）"></textarea>
         <button class="btn btn-primary" :disabled="loading" @click="onFirstVisit">创建档案并接诊 →</button>

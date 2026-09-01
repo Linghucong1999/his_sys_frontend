@@ -24,6 +24,7 @@ export interface Patient {
   phone?: string
   address?: string
   medicalRecordNo?: string
+  insuranceType?: string
   status?: string
 }
 

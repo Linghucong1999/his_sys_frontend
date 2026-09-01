@@ -23,13 +23,15 @@ export const usePatientStore = defineStore('patient', {
       age?: number
       phone?: string
       address?: string
+      insuranceType?: string
       chiefComplaint?: string
     }): Promise<Patient> {
       const patient = await createPatient({
         name: input.name,
         gender: input.gender,
         phone: input.phone,
-        address: input.address
+        address: input.address,
+        insuranceType: input.insuranceType
       })
       await createVisit({
         patientId: patient._id,

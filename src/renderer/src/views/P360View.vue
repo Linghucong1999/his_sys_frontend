@@ -234,7 +234,7 @@ watch(() => patientStore.current, () => void loadRecord())
           </div>
         </div>
         <div class="tags" style="margin-top: 12px">
-          <span class="tag tag-blue">医保：市职工</span>
+          <span class="tag tag-blue">医保：{{ patient.insuranceType ?? '自费' }}</span>
           <span v-if="form.pastHistory.includes('过敏')" class="tag tag-red">⚠ 过敏史</span>
           <span v-else class="tag tag-green">无过敏史</span>
         </div>

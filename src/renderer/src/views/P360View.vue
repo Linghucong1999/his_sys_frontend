@@ -18,7 +18,7 @@
           <span v-else class="tag tag-green">无过敏史</span>
         </div>
         <div style="margin-top: 12px">
-          <button class="btn btn-ghost btn-sm" @click="router.push('/emr')">📋 返回病历列表</button>
+          <button class="btn btn-ghost btn-sm" @click="goPatientList">🔁 返回患者列表</button>
         </div>
         <div class="ai-sec" style="margin-top: 16px">就诊旅程</div>
         <PatientJourney :nodes="journeyNodes" />
@@ -385,6 +385,13 @@ async function onResumeFromList(p: Patient): Promise<void> {
   await patientStore.resume(p, pendingTab)
 }
 
+/** 返回患者一览（接诊状态列表：未写处方/未写检查等可继续处理） */
+function goPatientList(): void {
+  patientPage.value = 1
+  patientStore.reset()
+  void loadAllPatients()
+}
+
 onMounted(() => {
   if (!patientStore.current) {
     void loadAllPatients()
@@ -399,7 +406,22 @@ onMounted(() => {
   }
 })
 
-watch(() => patientStore.current, () => void loadRecord())
+watch(
+  () => patientStore.current,
+  () => {
+    if (patientStore.current) {
+      // 续写跳转：进入患者时应用目标 tab（未写处方→处方、未写检查→检查申请）
+      const target = patientStore.consumeTargetTab()
+      if (target) {
+        tab.value = target as typeof tab.value
+      }
+      void loadRecord()
+    } else {
+      patientPage.value = 1
+      void loadAllPatients()
+    }
+  }
+)
 </script>
 
 <style scoped>

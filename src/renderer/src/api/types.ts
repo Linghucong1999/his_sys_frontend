@@ -52,6 +52,7 @@ export interface MedicalRecord {
   prescriptionSummary?: string
   examRequest?: string
   signed: boolean
+  prescriptionItems?: RxItem[]
   signedAt?: string
   signedBy?: string
   visitedAt?: string
@@ -134,6 +135,36 @@ export interface SearchResultItem {
   sub?: string
   ref?: string
   patientId?: string
+  manufacturer?: string
+  instructions?: string
+  spec?: string
+}
+
+export interface RxItem {
+  drug: string
+  spec?: string
+  dose?: string
+  frequency?: string
+  route?: string
+  duration?: string
+}
+
+/** 药品说明书库条目 */
+export interface DrugManual {
+  _id: string
+  drugName: string
+  genericName?: string
+  spec?: string
+  manufacturer?: string
+  approvalNo?: string
+  indications?: string
+  usage?: string
+  adverseReactions?: string
+  contraindications?: string
+  precautions?: string
+  fullText?: string
+  source?: string
+  crawledAt?: string
 }
 
 export interface DictionaryItem {

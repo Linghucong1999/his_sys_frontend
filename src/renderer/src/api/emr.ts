@@ -1,5 +1,5 @@
 import request from './request'
-import type { MedicalRecord, DiagnosisItem } from './types'
+import type { MedicalRecord, DiagnosisItem, RxItem } from './types'
 
 export interface SaveRecordInput {
   patientId: string
@@ -13,6 +13,7 @@ export interface SaveRecordInput {
   physicalExam?: string
   diagnosis?: DiagnosisItem[]
   prescriptionSummary?: string
+  prescriptionItems?: RxItem[]
   examRequest?: string
 }
 

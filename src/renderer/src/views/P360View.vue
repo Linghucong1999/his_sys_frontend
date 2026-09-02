@@ -58,8 +58,30 @@
             placeholder="输入诊断，或从下拉选择 ICD-10（多个诊断以「；」分隔）"
           />
         </EmrBlock>
-        <EmrBlock v-if="tab === 'prescription'" label="处方内容" ai="用药安全校验">
-          <AutoTextarea v-model="form.prescriptionSummary" placeholder="处方内容…" />
+        <EmrBlock v-if="tab === 'prescription'" label="处方表单" ai="药品联想输入">
+          <div class="rx-form">
+            <div v-for="(row, i) in rxRows" :key="i" class="rx-row">
+              <ElAutocomplete
+                v-model="row.drug"
+                class="rx-drug"
+                placeholder="药品名（输入联想）"
+                :fetch-suggestions="queryDrugs"
+                @select="(item) => onDrugSelect(item, row)"
+              />
+              <ElInput v-model="row.spec" class="rx-spec" placeholder="规格" />
+              <ElInput v-model="row.dose" class="rx-dose" placeholder="剂量" />
+              <ElSelect v-model="row.frequency" class="rx-freq" placeholder="频次" clearable>
+                <ElOption v-for="f in FREQ_OPTIONS" :key="f.value" :label="f.label" :value="f.value" />
+              </ElSelect>
+              <ElSelect v-model="row.route" class="rx-route" placeholder="途径" clearable>
+                <ElOption v-for="r in ROUTE_OPTIONS" :key="r" :label="r" :value="r" />
+              </ElSelect>
+              <ElInput v-model="row.duration" class="rx-dur" placeholder="疗程(如7天)" />
+              <button class="btn btn-ghost btn-sm rx-del" @click="removeRxRow(i)">✕</button>
+            </div>
+            <button class="btn btn-ghost btn-sm" @click="addRxRow">＋ 添加药品</button>
+            <div v-if="legacyRxText" class="legacy-rx">历史处方（文本）：{{ legacyRxText }}</div>
+          </div>
         </EmrBlock>
         <EmrBlock v-if="tab === 'exam'" label="检查申请">
           <AutoTextarea v-model="form.examRequest" placeholder="检查项目与临床指征（CA 签名前必填）" />
@@ -152,15 +174,18 @@ import PatientJourney from '@/components/PatientJourney.vue'
 import type { JourneyNode } from '@/components/PatientJourney.vue'
 import EmrBlock from '@/components/EmrBlock.vue'
 import AiCopilotPanel from '@/components/AiCopilotPanel.vue'
-import type { DiagnosisItem, MedicalRecord } from '@/api/types'
-import type { Patient } from '@/api/types'
+import type { DiagnosisItem, MedicalRecord, RxItem, Patient } from '@/api/types'
 import { buildRecordPrintHtml } from '@/utils/print'
 import PrintPreviewDialog from '@/components/PrintPreviewDialog.vue'
 import HisCombobox from '@/components/HisCombobox.vue'
 import Pagination from '@/components/Pagination.vue'
 import AutoTextarea from '@/components/AutoTextarea.vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessageBox, ElAutocomplete, ElSelect, ElOption, ElInput } from 'element-plus'
 import 'element-plus/es/components/message-box/style/css'
+import 'element-plus/es/components/autocomplete/style/css'
+import 'element-plus/es/components/select/style/css'
+import 'element-plus/es/components/option/style/css'
+import 'element-plus/es/components/input/style/css'
 
 /** 统一错误弹窗 */
 function alertError(msg: string, title = '操作失败'): void {
@@ -188,6 +213,64 @@ const form = ref({
 
 const icdOptions = ref<Array<{ code: string; name: string }>>([])
 
+/** 处方表单：药品联想 + 结构化条目 */
+const drugOptions = ref<Array<{ value: string; spec?: string }>>([])
+const rxRows = ref<RxItem[]>([{ drug: '' }])
+const FREQ_OPTIONS = [
+  { value: 'qd', label: 'qd（每日一次）' },
+  { value: 'bid', label: 'bid（每日两次）' },
+  { value: 'tid', label: 'tid（每日三次）' },
+  { value: 'qid', label: 'qid（每日四次）' },
+  { value: 'q8h', label: 'q8h（每8小时）' },
+  { value: 'q12h', label: 'q12h（每12小时）' },
+  { value: 'qn', label: 'qn（每晚）' },
+  { value: 'prn', label: 'prn（按需）' }
+]
+const ROUTE_OPTIONS = ['口服', '静脉滴注', '静脉注射', '肌肉注射', '雾化吸入', '外用', '舌下含服']
+
+function queryDrugs(query: string, cb: (list: Array<{ value: string; spec?: string }>) => void): void {
+  const kw = (query ?? '').trim().toLowerCase()
+  const list = kw
+    ? drugOptions.value.filter((d) => d.value.toLowerCase().includes(kw)).slice(0, 8)
+    : drugOptions.value.slice(0, 8)
+  cb(list)
+}
+
+function onDrugSelect(item: { value?: string; spec?: string }, row: RxItem): void {
+  row.drug = item.value ?? row.drug
+  row.spec = row.spec ?? item.spec ?? ''
+}
+
+function addRxRow(): void {
+  rxRows.value.push({ drug: '' })
+}
+
+function removeRxRow(i: number): void {
+  if (rxRows.value.length > 1) rxRows.value.splice(i, 1)
+}
+
+/** 有效处方条目（药名非空） */
+const validRxRows = computed(() => rxRows.value.filter((r) => r.drug.trim()))
+
+/** 生成兼容文本摘要：药名 剂量 途径 频次 ×疗程 */
+const rxSummary = computed(() =>
+  validRxRows.value
+    .map((r) => {
+      const dose = r.dose ?? r.spec ?? ''
+      const route = r.route ? ` ${r.route}` : ''
+      const freq = r.frequency ? ` ${r.frequency}` : ''
+      const dur = r.duration ? ` ×${r.duration}` : ''
+      return `${r.drug} ${dose}${route}${freq}${dur}`.replace(/\s+/g, ' ').trim()
+    })
+    .join('；')
+)
+
+/** 旧数据回退：无结构化条目时显示历史处方文本 */
+const legacyRxText = computed(() => {
+  if (validRxRows.value.length > 0) return ''
+  return form.value.prescriptionSummary ?? ''
+})
+
 const patient = computed(() => patientStore.current)
 const signed = computed(() => currentRecord.value?.signed ?? false)
 
@@ -213,6 +296,11 @@ const journeyNodes = computed<JourneyNode[]>(() => {
 
 async function loadIcd(): Promise<void> {
   icdOptions.value = await listDictionaries('icd10')
+  const drugs = await listDictionaries('drug')
+  drugOptions.value = drugs.map((d) => ({
+    value: d.name,
+    spec: (d.extra as Record<string, string> | undefined)?.spec ?? ''
+  }))
 }
 
 async function loadRecord(): Promise<void> {
@@ -229,6 +317,12 @@ async function loadRecord(): Promise<void> {
       diagnosisText: latest.diagnosis?.map((d) => `${d.code} ${d.name}`).join('；') ?? '',
       prescriptionSummary: latest.prescriptionSummary ?? '',
       examRequest: latest.examRequest ?? ''
+    }
+    // 处方回填：优先结构化条目
+    if (latest.prescriptionItems && latest.prescriptionItems.length > 0) {
+      rxRows.value = latest.prescriptionItems.map((r) => ({ ...r }))
+    } else {
+      rxRows.value = [{ drug: '' }]
     }
   }
 }
@@ -259,7 +353,8 @@ async function onSave(): Promise<void> {
       pastHistory: form.value.pastHistory,
       physicalExam: form.value.physicalExam,
       diagnosis: parseDiagnosis(form.value.diagnosisText),
-      prescriptionSummary: form.value.prescriptionSummary,
+      prescriptionSummary: rxSummary.value || form.value.prescriptionSummary,
+      prescriptionItems: validRxRows.value,
       examRequest: form.value.examRequest
     }
     if (currentRecord.value && !currentRecord.value.signed) {
@@ -286,7 +381,7 @@ async function onSign(): Promise<void> {
   // CA 签名前置条件：门诊病历 / 处方 / 检查申请 三者缺一不可（不满足弹窗提示）
   const missing: string[] = []
   if (!form.value.chiefComplaint.trim()) missing.push('门诊病历（主诉未填写）')
-  if (!form.value.prescriptionSummary.trim()) missing.push('处方')
+  if (!(rxSummary.value || form.value.prescriptionSummary.trim())) missing.push('处方')
   if (!form.value.examRequest.trim()) missing.push('检查申请')
   if (missing.length > 0) {
     await ElMessageBox.alert(
@@ -519,6 +614,31 @@ watch(
   justify-content: flex-end;
   padding: 13px 20px;
   border-top: 1px solid var(--border);
+}
+/* 处方表单 */
+.rx-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rx-row {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 0.9fr 1.1fr 1fr 1fr 36px;
+  gap: 6px;
+  align-items: center;
+}
+.rx-del {
+  color: var(--red);
+  padding: 0;
+}
+.legacy-rx {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-mute);
+  background: var(--card2);
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+  padding: 8px 10px;
 }
 @media (max-width: 1200px) {
   .p360 {

@@ -43,7 +43,8 @@ const navs = [
   { view: 'p360', icon: '🩺', tip: '患者 360° 工作站' },
   { view: 'inpatient', icon: '🛏', tip: '住院工作站' },
   { view: 'emr', icon: '📋', tip: '电子病历 EMR' },
-  { view: 'consultations', icon: '🤝', tip: '会诊管理' }
+  { view: 'consultations', icon: '🤝', tip: '会诊管理' },
+  { view: 'drugs', icon: '💊', tip: '药品说明书' }
 ]
 
 function go(view: string): void {

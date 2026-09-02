@@ -92,7 +92,9 @@ async function execute(item: SearchResultItem): Promise<void> {
     else if (item.title.includes('签名')) router.push('/emr')
     else router.push('/workbench')
   } else if (item.kind === 'drug') {
-    router.push('/p360')
+    // 跳转药品说明书页面并自动选中
+    const name = item.title.split('·')[0].trim()
+    router.push({ path: '/drugs', query: { name } })
   }
 }
 
@@ -193,6 +195,31 @@ onBeforeUnmount(() => document.removeEventListener('keydown', onKeydown))
   text-align: center;
   color: var(--text-mute);
   font-size: 12.5px;
+}
+.drug-detail {
+  font-size: 13px;
+  color: var(--text);
+}
+.drug-name {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 12px;
+}
+.drug-row {
+  margin-bottom: 6px;
+  color: var(--text-sub);
+}
+.drug-ins {
+  margin-top: 10px;
+  line-height: 1.8;
+}
+.drug-ins p {
+  margin-top: 6px;
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: var(--text-sub);
 }
 .cmdk-ft {
   padding: 9px 16px;

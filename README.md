@@ -39,7 +39,7 @@
 │           ├── layouts/GlassShell.vue        # 玻璃拟态外壳（导航+顶栏+视图区）
 │           ├── components/     # IconNav/TopBar/CommandPalette/StatCard/Sparkline/
 │           │                   # PatientJourney/EmrBlock/AiCopilotPanel/QuickStartCard
-│           └── views/          # LoginView/WorkbenchView/P360View/InpatientView/EmrView/ConsultationView
+│           └── views/          # Login/Workbench/P360/Inpatient/Emr/Consultation/Drugs
 ```
 
 ## 功能视图（第一版）
@@ -52,7 +52,8 @@
 | 住院工作站 | 病区筛选、床位卡片网格、长期/临时医嘱、停嘱 | `GET /api/inpatient/*` |
 | 电子病历 | 病历/处方列表（筛选）、预览、CA 签名、打印 | `GET /api/emr/records` |
 | 会诊管理 | 会诊列表（待响应/进行中）、发起会诊、响应、催办 | `GET/POST /api/consultations` |
-| Cmd+K | 患者调档/病历/药品/命令聚合搜索 | `GET /api/search?q=` |
+| 药品说明书 | 药品搜索、厂家与说明书全文展示（说明书库 drugmanuals） | `GET /api/drug-manuals` |
+| Cmd+K | 患者调档/病历/药品/命令聚合搜索（药品结果跳转说明书页） | `GET /api/search?q=` |
 | 深色模式 | 底部导航一键切换，localStorage 持久化 | — |
 
 ## 界面预览

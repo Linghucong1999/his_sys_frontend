@@ -45,6 +45,12 @@ const routes: RouteRecordRaw[] = [
         name: 'Consultations',
         component: () => import('@/views/ConsultationView.vue'),
         meta: { title: '会诊管理' }
+      },
+      {
+        path: 'drugs',
+        name: 'Drugs',
+        component: () => import('@/views/DrugsView.vue'),
+        meta: { title: '药品说明书' }
       }
     ]
   }

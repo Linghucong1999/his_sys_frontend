@@ -1,8 +1,13 @@
 import request from './request'
-import type { DictionaryItem, SearchResultItem, Visit } from './types'
+import type { DictionaryItem, SearchResultItem, Visit, DrugManual } from './types'
 
 export function listDictionaries(category: string, keyword?: string): Promise<DictionaryItem[]> {
   return request.get(`/dictionaries/${category}`, { params: { keyword } })
+}
+
+/** 药品说明书库 */
+export function fetchDrugManuals(keyword?: string): Promise<DrugManual[]> {
+  return request.get('/drug-manuals', { params: { keyword } })
 }
 
 export function globalSearch(q: string, limit = 8): Promise<SearchResultItem[]> {

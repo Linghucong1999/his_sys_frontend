@@ -514,6 +514,8 @@ function goPatientList(): void {
 }
 
 onMounted(() => {
+  // 字典提前加载：从患者列表“续写”进入时 drugOptions 已就绪（否则处方联想无数据）
+  void loadIcd()
   if (!patientStore.current) {
     void loadAllPatients()
   } else {
@@ -522,7 +524,6 @@ onMounted(() => {
     if (target) {
       tab.value = target as typeof tab.value
     }
-    void loadIcd()
     void loadRecord()
   }
 })

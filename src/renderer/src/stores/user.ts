@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { login as apiLogin } from '@/api/auth'
+import { usePatientStore } from '@/stores/patient'
 import type { UserInfo } from '@/api/types'
 
 const TOKEN_KEY = 'his_token'
@@ -42,12 +43,15 @@ export const useUserStore = defineStore('user', {
       this.user = result.user
       localStorage.setItem(TOKEN_KEY, result.token)
       localStorage.setItem(USER_KEY, JSON.stringify(result.user))
+      // 切换账号：清空上一账号的接诊上下文（权限隔离）
+      usePatientStore().reset()
     },
     logout(): void {
       this.token = ''
       this.user = null
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem(USER_KEY)
+      usePatientStore().reset()
     }
   }
 })

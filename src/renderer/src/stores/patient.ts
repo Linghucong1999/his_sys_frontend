@@ -68,6 +68,13 @@ export const usePatientStore = defineStore('patient', {
       const { fetchPatient } = await import('@/api/patients')
       this.current = await fetchPatient(patientId)
       this.visits = await listVisitsByPatient(patientId)
+    },
+
+    /** 切换账号时清空接诊上下文（防止看到其他医生的接诊状态） */
+    reset(): void {
+      this.current = null
+      this.visits = []
+      this.searchResults = []
     }
   }
 })

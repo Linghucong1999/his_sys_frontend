@@ -10,18 +10,19 @@
           <input v-model="firstForm.phone" class="inp" placeholder="手机号" />
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
-          <HisSelect
-            v-model="firstForm.gender"
-            :options="GENDER_OPTIONS"
-            placeholder="性别"
-          />
+          <ElSelect v-model="firstForm.gender" class="his-ep-select" placeholder="性别" clearable>
+            <ElOption v-for="o in GENDER_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
+          </ElSelect>
           <input v-model="firstForm.age" class="inp" placeholder="年龄" />
         </div>
-        <HisSelect
+        <ElSelect
           v-model="firstForm.insuranceType"
-          :options="INSURANCE_OPTIONS"
-          placeholder="医保类型（市职工 / 城乡居民 / 新农合 / 商业保险 / 自费）"
-        />
+          class="his-ep-select"
+          placeholder="医保类型"
+          clearable
+        >
+          <ElOption v-for="o in INSURANCE_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
+        </ElSelect>
         <input v-model="firstForm.address" class="inp" placeholder="住址（常住地址）" />
         <textarea v-model="firstForm.chiefComplaint" class="inp" placeholder="主诉（一句话）"></textarea>
         <button class="btn btn-primary" :disabled="loading" @click="onFirstVisit">创建档案并接诊 →</button>
@@ -75,9 +76,10 @@
 import { reactive, ref, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePatientStore, TAB_OF_PENDING } from '@/stores/patient'
-import HisSelect from '@/components/HisSelect.vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessageBox, ElSelect, ElOption } from 'element-plus'
 import 'element-plus/es/components/message-box/style/css'
+import 'element-plus/es/components/select/style/css'
+import 'element-plus/es/components/option/style/css'
 import type { Patient } from '@/api/types'
 
 /** 统一错误弹窗 */

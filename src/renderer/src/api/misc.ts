@@ -6,8 +6,13 @@ export function listDictionaries(category: string, keyword?: string): Promise<Di
 }
 
 /** 药品说明书库 */
-export function fetchDrugManuals(keyword?: string): Promise<DrugManual[]> {
-  return request.get('/drug-manuals', { params: { keyword } })
+export function fetchDrugManuals(keyword?: string, source?: string, category?: string): Promise<DrugManual[]> {
+  return request.get('/drug-manuals', { params: { keyword, source, category } })
+}
+
+/** 药理分类列表 */
+export function fetchDrugCategories(): Promise<string[]> {
+  return request.get('/drug-manuals/categories')
 }
 
 export function globalSearch(q: string, limit = 8): Promise<SearchResultItem[]> {

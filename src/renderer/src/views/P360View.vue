@@ -52,10 +52,12 @@
           </EmrBlock>
         </div>
         <EmrBlock v-if="tab === 'record'" label="初步诊断" ai="ICD-10 智能匹配" highlight>
-          <HisCombobox
+          <ElAutocomplete
             v-model="form.diagnosisText"
-            :options="icdOptions.map((d) => ({ value: d.code, label: d.name }))"
+            class="his-ep-select"
             placeholder="输入诊断，或从下拉选择 ICD-10（多个诊断以「；」分隔）"
+            :fetch-suggestions="queryIcd"
+            @select="onIcdSelect"
           />
         </EmrBlock>
         <EmrBlock v-if="tab === 'prescription'" label="处方表单" ai="药品联想输入">
@@ -234,6 +236,30 @@ function queryDrugs(query: string, cb: (list: Array<{ value: string; spec?: stri
     ? drugOptions.value.filter((d) => d.value.toLowerCase().includes(kw)).slice(0, 8)
     : drugOptions.value.slice(0, 8)
   cb(list)
+}
+
+/** ICD-10 联想（el-autocomplete 数据源） */
+function queryIcd(query: string, cb: (list: Array<{ value: string }>) => void): void {
+  const segs = form.value.diagnosisText.split(/[；;]/)
+  const kw = (segs[segs.length - 1] ?? '').trim().toLowerCase()
+  const list = icdOptions.value
+    .filter((d) => !kw || d.name.toLowerCase().includes(kw) || d.code.toLowerCase().includes(kw))
+    .slice(0, 8)
+    .map((d) => ({ value: `${d.code} ${d.name}` }))
+  cb(list)
+}
+
+/** 选择诊断：替换正在编辑片段并自动补齐「；」 */
+function onIcdSelect(item: { value?: string }): void {
+  const v = item.value ?? ''
+  const trimmed = form.value.diagnosisText.trim()
+  const segs = trimmed
+    .split(/[；;]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+  const done =
+    trimmed === '' || trimmed.endsWith('；') || trimmed.endsWith(';') ? segs : segs.slice(0, -1)
+  form.value.diagnosisText = [...done, v].join('；') + '；'
 }
 
 function onDrugSelect(item: { value?: string; spec?: string }, row: RxItem): void {

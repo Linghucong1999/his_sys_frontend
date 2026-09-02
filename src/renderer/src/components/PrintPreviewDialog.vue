@@ -16,15 +16,15 @@
         <div class="preview-ops">
           <div class="ops-sec">
             <div class="ops-label">打印机</div>
-            <HisSelect
-              v-model="selectedPrinter"
-              :options="printerOptions"
-              placeholder="未检测到打印机"
-            />
+            <ElSelect v-model="selectedPrinter" class="his-ep-select" placeholder="未检测到打印机" clearable>
+              <ElOption v-for="p in printerOptions" :key="p.value" :label="p.label" :value="p.value" />
+            </ElSelect>
           </div>
           <div class="ops-sec">
             <div class="ops-label">纸张</div>
-            <HisSelect v-model="pageSize" :options="PAPER_OPTIONS" placeholder="纸张" />
+            <ElSelect v-model="pageSize" class="his-ep-select" placeholder="纸张" clearable>
+              <ElOption v-for="p in PAPER_OPTIONS" :key="p.value" :label="p.label" :value="p.value" />
+            </ElSelect>
           </div>
           <div class="ops-sec">
             <div class="ops-label">份数</div>
@@ -50,7 +50,9 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import HisSelect from '@/components/HisSelect.vue'
+import { ElSelect, ElOption } from 'element-plus'
+import 'element-plus/es/components/select/style/css'
+import 'element-plus/es/components/option/style/css'
 
 const props = defineProps<{
   visible: boolean

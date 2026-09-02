@@ -297,3 +297,28 @@ select.inp.placeholder {
   letter-spacing: 1px;
   margin: 14px 0 8px;
 }
+
+/* Element Plus 主题变量对齐品牌蓝 */
+:root {
+  --el-color-primary: #0052d9;
+  --el-color-primary-light-3: #407de2;
+  --el-color-primary-light-5: #7fa8ed;
+  --el-color-primary-light-7: #bfd2f6;
+  --el-color-primary-light-8: #d9e5f9;
+  --el-color-primary-light-9: #e6efff;
+  --el-color-primary-dark-2: #0042ae;
+}
+
+/* Element Plus 选择器/联想输入框样式对齐（自研 UI 圆角风格） */
+.his-ep-select {
+  width: 100%;
+}
+.his-ep-select .el-input__wrapper {
+  border-radius: 10px;
+  min-height: 36px;
+  box-shadow: 0 0 0 1px var(--border-strong) inset;
+  transition: 0.15s;
+}
+.his-ep-select .el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--primary) inset;
+}

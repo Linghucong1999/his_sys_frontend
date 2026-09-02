@@ -10,6 +10,23 @@
         @keydown.enter="load"
       />
       <button class="btn btn-ghost btn-sm" @click="load">搜索</button>
+      <span class="sep"></span>
+      <div class="cat-select">
+        <ElSelect v-model="categoryFilter" class="his-ep-select" placeholder="药理分类" clearable @change="changeCategory">
+          <ElOption value="" label="全部药理分类" />
+          <ElOption v-for="c in categories" :key="c" :label="c" :value="c" />
+        </ElSelect>
+      </div>
+      <span class="sep"></span>
+      <div
+        v-for="c in SOURCE_CHIPS"
+        :key="c.value"
+        class="chip"
+        :class="{ active: sourceFilter === c.value }"
+        @click="changeSource(c.value)"
+      >
+        {{ c.label }}
+      </div>
       <span class="tag tag-blue" style="margin-left: auto">共 {{ drugs.length }} 种药品</span>
     </div>
     <div class="grid2">
@@ -39,8 +56,8 @@
           <span class="tag tag-blue">{{ selected.spec ?? '—' }}</span>
         </div>
         <div class="detail-body">
-          <div class="row"><span class="lb">生产厂家</span>{{ selected.manufacturer ?? '—' }}</div>
-          <div class="row"><span class="lb">数据来源</span>{{ selected.source === 'crawl' ? '爬虫采集' : '内置数据' }}</div>
+          <div class="row"><span class="lb">规格</span>{{ selected.spec ?? '—' }}</div>
+          <div class="row"><span class="lb">数据来源</span>{{ selected.source === 'crawl' ? '爬虫采集' : selected.source === 'vbp-catalog' ? '集采目录' : selected.source === 'base-catalog' ? '基药目录' : '内置数据' }}</div>
           <div class="ins">
             <div class="ins-title">【说明书】</div>
             <p>{{ selected.fullText ?? selected.indications ?? '暂无说明书内容' }}</p>
@@ -58,17 +75,34 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { fetchDrugManuals } from '@/api/misc'
+import { fetchDrugManuals, fetchDrugCategories } from '@/api/misc'
+import { ElSelect, ElOption } from 'element-plus'
+import 'element-plus/es/components/select/style/css'
+import 'element-plus/es/components/option/style/css'
 import type { DrugManual } from '@/api/types'
 
 const route = useRoute()
 const router = useRouter()
 const keyword = ref('')
+const sourceFilter = ref<'all' | 'seed' | 'base-catalog' | 'vbp-catalog'>('all')
+const categoryFilter = ref('')
+const categories = ref<string[]>([])
 const drugs = ref<DrugManual[]>([])
 const selected = ref<DrugManual | null>(null)
 
+const SOURCE_CHIPS = [
+  { value: 'all', label: '全部' },
+  { value: 'seed', label: '📖 有说明书' },
+  { value: 'base-catalog', label: '基药目录' },
+  { value: 'vbp-catalog', label: '集采目录' }
+] as const
+
 async function load(): Promise<void> {
-  drugs.value = await fetchDrugManuals(keyword.value.trim() || undefined)
+  drugs.value = await fetchDrugManuals(
+    keyword.value.trim() || undefined,
+    sourceFilter.value === 'all' ? undefined : sourceFilter.value,
+    categoryFilter.value || undefined
+  )
   // Cmd+K 跳转带 name 参数时自动选中
   const name = route.query.name
   if (typeof name === 'string' && name) {
@@ -77,6 +111,25 @@ async function load(): Promise<void> {
     selected.value = drugs.value[0] ?? null
   }
 }
+
+function changeSource(s: typeof sourceFilter.value): void {
+  sourceFilter.value = s
+  selected.value = null
+  void load()
+}
+
+function changeCategory(c: string): void {
+  categoryFilter.value = c
+  selected.value = null
+  void load()
+}
+
+onMounted(() => {
+  void load()
+  void fetchDrugCategories().then((list) => {
+    categories.value = list
+  })
+})
 
 onMounted(() => {
   void load()
@@ -216,5 +269,8 @@ onMounted(() => {
   justify-content: center;
   color: var(--text-mute);
   font-size: 13px;
+}
+.cat-select {
+  width: 200px;
 }
 </style>

@@ -7,6 +7,7 @@
       :placeholder="placeholder"
       @input="onInput(($event.target as HTMLInputElement).value)"
       @focus="positionPanel(); open = true"
+      @click="positionPanel(); open = true"
       @keydown.escape="open = false"
     />
     <Teleport to="body">
@@ -109,16 +110,18 @@ function onInput(v: string): void {
   positionPanel()
 }
 
-/** 选中选项：替换正在编辑的片段（多诊断自动以「；」分隔追加） */
+/** 选中选项：替换正在编辑的片段并自动补齐「；」（多诊断连续录入） */
 function pick(opt: ComboboxOption): void {
-  const segs = props.modelValue.split(/[；;]/).map((s) => s.trim()).filter(Boolean)
+  const trimmed = props.modelValue.trim()
+  const segs = trimmed
+    .split(/[；;]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
   const full = `${opt.value} ${opt.label}`
-  if (segs.length === 0) {
-    emit('update:modelValue', full)
-  } else {
-    const done = segs.slice(0, -1)
-    emit('update:modelValue', [...done, full].join('；'))
-  }
+  // 末尾已有分号或为空：保留全部已完成片段；否则去掉未完成的末段
+  const done =
+    trimmed === '' || trimmed.endsWith('；') || trimmed.endsWith(';') ? segs : segs.slice(0, -1)
+  emit('update:modelValue', [...done, full].join('；') + '；')
   open.value = false
   inputRef.value?.focus()
 }

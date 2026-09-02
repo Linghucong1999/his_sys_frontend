@@ -14,6 +14,11 @@
       <div class="chip" :class="{ active: filter === 'unsigned' }" @click="changeFilter('unsigned')">待签名</div>
       <div class="chip" :class="{ active: filter === 'signed' }" @click="changeFilter('signed')">已签名</div>
       <div class="chip" :class="{ active: filter === 'recent' }" @click="changeFilter('recent')">近 30 天 ▾</div>
+      <span class="sep"></span>
+      <div class="chip" :class="{ active: typeFilter === 'all' }" @click="changeTypeFilter('all')">全部类型</div>
+      <div class="chip" :class="{ active: typeFilter === 'outpatient' }" @click="changeTypeFilter('outpatient')">门诊病历</div>
+      <div class="chip" :class="{ active: typeFilter === 'prescription' }" @click="changeTypeFilter('prescription')">💊 处方</div>
+      <div class="chip" :class="{ active: typeFilter === 'admission' }" @click="changeTypeFilter('admission')">入院记录</div>
       <span class="tag tag-blue" style="margin-left: auto">共 {{ total }} 条</span>
     </div>
 
@@ -58,32 +63,60 @@
           </span>
         </div>
         <div class="prev-body">
-          <div v-if="selected.chiefComplaint" class="block">
-            <div class="bl">主诉</div>
-            <div class="bb">{{ selected.chiefComplaint }}</div>
-          </div>
-          <div v-if="selected.presentIllness" class="block">
-            <div class="bl">现病史</div>
-            <div class="bb">{{ selected.presentIllness }}</div>
-          </div>
-          <div v-if="selected.pastHistory" class="block">
-            <div class="bl">既往史</div>
-            <div class="bb">{{ selected.pastHistory }}</div>
-          </div>
-          <div v-if="selected.physicalExam" class="block">
-            <div class="bl">体格检查</div>
-            <div class="bb">{{ selected.physicalExam }}</div>
-          </div>
-          <div v-if="selected.diagnosis.length > 0" class="block hl">
-            <div class="bl">诊断</div>
-            <div class="bb" style="font-weight: 600">
-              <div v-for="d in selected.diagnosis" :key="d.code">{{ d.code }} {{ d.name }}</div>
+          <!-- 处方类型：处方笺版式 -->
+          <div v-if="selected.type === 'prescription'" class="rx-pad">
+            <div class="rx-title">处 方 笺</div>
+            <div class="rx-meta">
+              <span>姓名：{{ selected.patientName }}</span>
+              <span>科别：{{ selected.department }}</span>
+              <span>日期：{{ fmtFull(selected.visitedAt) }}</span>
+              <span>处方编号：{{ selected.recordNo }}</span>
+            </div>
+            <div class="rx-dx">临床诊断：{{ rxDiagnosis || '—' }}</div>
+            <div class="rx-rp">
+              <div class="rx-rp-h">Rp</div>
+              <div v-for="(item, i) in rxItems" :key="i" class="rx-item">{{ i + 1 }}. {{ item }}</div>
+              <div v-if="rxItems.length === 0" class="rx-empty">（暂无处方明细）</div>
+            </div>
+            <div class="rx-sign">
+              <span>医师：{{ selected.signedBy ?? selected.doctorName }}</span>
+              <span v-if="selected.signed" class="tag tag-green">🔏 已 CA 签名</span>
+              <span v-else class="tag tag-orange">待签名</span>
             </div>
           </div>
-          <div v-if="selected.prescriptionSummary" class="block">
-            <div class="bl">处方摘要</div>
-            <div class="bb">{{ selected.prescriptionSummary }}</div>
-          </div>
+          <!-- 病历类型：区块版式 -->
+          <template v-else>
+            <div v-if="selected.chiefComplaint" class="block">
+              <div class="bl">主诉</div>
+              <div class="bb">{{ selected.chiefComplaint }}</div>
+            </div>
+            <div v-if="selected.presentIllness" class="block">
+              <div class="bl">现病史</div>
+              <div class="bb">{{ selected.presentIllness }}</div>
+            </div>
+            <div v-if="selected.pastHistory" class="block">
+              <div class="bl">既往史</div>
+              <div class="bb">{{ selected.pastHistory }}</div>
+            </div>
+            <div v-if="selected.physicalExam" class="block">
+              <div class="bl">体格检查</div>
+              <div class="bb">{{ selected.physicalExam }}</div>
+            </div>
+            <div v-if="selected.examRequest" class="block">
+              <div class="bl">检查申请</div>
+              <div class="bb">{{ selected.examRequest }}</div>
+            </div>
+            <div v-if="selected.diagnosis.length > 0" class="block hl">
+              <div class="bl">诊断</div>
+              <div class="bb" style="font-weight: 600">
+                <div v-for="d in selected.diagnosis" :key="d.code">{{ d.code }} {{ d.name }}</div>
+              </div>
+            </div>
+            <div v-if="selected.prescriptionSummary" class="block">
+              <div class="bl">处方摘要</div>
+              <div class="bb">{{ selected.prescriptionSummary }}</div>
+            </div>
+          </template>
         </div>
         <div class="prev-ft">
           <button class="btn btn-ghost" :disabled="busy" @click="onPrint">🖨 打印</button>
@@ -123,6 +156,7 @@ const records = ref<MedicalRecord[]>([])
 const selected = ref<MedicalRecord | null>(null)
 const keyword = ref('')
 const filter = ref<'all' | 'unsigned' | 'signed' | 'recent'>('all')
+const typeFilter = ref<'all' | 'outpatient' | 'prescription' | 'admission'>('all')
 const busy = ref(false)
 
 const page = ref(1)
@@ -136,11 +170,25 @@ const pageSize = computed(() => {
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
 
+/** 处方条目：按分号拆分 prescriptionSummary */
+const rxItems = computed(() => {
+  if (!selected.value?.prescriptionSummary) return []
+  return selected.value.prescriptionSummary
+    .split(/[；;]/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+})
+
+const rxDiagnosis = computed(() =>
+  selected.value?.diagnosis.map((d) => (d.code ? `${d.code} ${d.name}` : d.name)).join('；') ?? ''
+)
+
 async function load(): Promise<void> {
   const result = await fetchRecordPage({
     keyword: keyword.value.trim() || undefined,
     signed: filter.value === 'unsigned' ? 'false' : filter.value === 'signed' ? 'true' : undefined,
     recent: filter.value === 'recent' ? true : undefined,
+    type: typeFilter.value === 'all' ? undefined : typeFilter.value,
     page: page.value,
     pageSize: pageSize.value
   })
@@ -154,6 +202,12 @@ async function load(): Promise<void> {
 
 function changeFilter(f: typeof filter.value): void {
   filter.value = f
+  page.value = 1
+  void load()
+}
+
+function changeTypeFilter(f: typeof typeFilter.value): void {
+  typeFilter.value = f
   page.value = 1
   void load()
 }
@@ -358,5 +412,69 @@ onMounted(() => {
 .bb {
   font-size: 13.5px;
   line-height: 1.7;
+}
+/* 处方笺版式 */
+.rx-pad {
+  margin: 16px 20px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px 26px;
+  box-shadow: var(--shadow);
+  font-family: var(--font);
+}
+.rx-title {
+  text-align: center;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 8px;
+  margin-bottom: 16px;
+}
+.rx-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  font-size: 12.5px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--border-strong);
+}
+.rx-dx {
+  margin: 12px 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.rx-rp {
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  padding: 14px 16px;
+  min-height: 120px;
+  background: #fdfdf8;
+}
+.rx-rp-h {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+.rx-item {
+  font-size: 13px;
+  line-height: 2;
+}
+.rx-empty {
+  color: var(--text-mute);
+  font-size: 12px;
+  padding: 10px 0;
+}
+.rx-sign {
+  margin-top: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12.5px;
+}
+.sep {
+  width: 1px;
+  height: 18px;
+  background: var(--border-strong);
+  margin: 0 4px;
 }
 </style>

@@ -139,6 +139,8 @@ import PrintPreviewDialog from '@/components/PrintPreviewDialog.vue'
 import HisCombobox from '@/components/HisCombobox.vue'
 import Pagination from '@/components/Pagination.vue'
 import AutoTextarea from '@/components/AutoTextarea.vue'
+import { ElMessageBox } from 'element-plus'
+import 'element-plus/es/components/message-box/style/css'
 
 const router = useRouter()
 const patientStore = usePatientStore()
@@ -164,18 +166,19 @@ const icdOptions = ref<Array<{ code: string; name: string }>>([])
 const patient = computed(() => patientStore.current)
 const signed = computed(() => currentRecord.value?.signed ?? false)
 
-/** 就诊旅程五节点（对齐 UI 稿演示流程） */
+/** 就诊旅程五节点（对齐 UI 稿演示流程，标注接诊医生） */
 const journeyNodes = computed<JourneyNode[]>(() => {
   const today = patientStore.visits.find((v) => {
     const d = new Date(v.visitedAt)
     const now = new Date()
     return d.toDateString() === now.toDateString()
   })
+  const doctor = today?.doctorName ?? '—'
   const base = today ? new Date(today.visitedAt) : new Date()
   const fmtT = (d: Date): string =>
     `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
   return [
-    { time: fmtT(base), label: '建档 · 首诊（医师创建）', state: 'done' },
+    { time: fmtT(base), label: `建档 · 接诊（${doctor}）`, state: 'done' },
     { time: fmtT(new Date(base.getTime() + 18 * 60000)), label: '体征录入 · T 38.2℃ P 92', state: 'done' },
     { time: fmtT(new Date(base.getTime() + 54 * 60000)), label: '接诊 · 病历已 CA 签名', state: signed.value ? 'done' : 'current' },
     { time: signed.value ? fmtT(new Date(base.getTime() + 70 * 60000)) : '进行中', label: '处方审核 · 待 CA 签名', state: 'current' },
@@ -255,13 +258,17 @@ async function onSign(): Promise<void> {
     await onSave()
   }
   if (!currentRecord.value) return
-  // CA 签名前置条件：门诊病历 / 处方 / 检查申请 三者缺一不可
+  // CA 签名前置条件：门诊病历 / 处方 / 检查申请 三者缺一不可（不满足弹窗提示）
   const missing: string[] = []
   if (!form.value.chiefComplaint.trim()) missing.push('门诊病历（主诉未填写）')
   if (!form.value.prescriptionSummary.trim()) missing.push('处方')
   if (!form.value.examRequest.trim()) missing.push('检查申请')
   if (missing.length > 0) {
-    errorMsg.value = `以下内容未完成，不可 CA 签名：${missing.join('、')}`
+    await ElMessageBox.alert(
+      `以下内容未完成，不可 CA 签名：${missing.join('、')}`,
+      '无法 CA 签名',
+      { confirmButtonText: '知道了', type: 'warning' }
+    )
     return
   }
   busy.value = true
@@ -269,7 +276,10 @@ async function onSign(): Promise<void> {
     currentRecord.value = await signRecord(currentRecord.value._id)
     savedTip.value = '已 CA 签名'
   } catch (e) {
-    errorMsg.value = (e as Error).message
+    await ElMessageBox.alert((e as Error).message, '签名失败', {
+      confirmButtonText: '知道了',
+      type: 'error'
+    })
   } finally {
     busy.value = false
   }

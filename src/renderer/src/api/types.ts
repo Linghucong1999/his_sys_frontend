@@ -38,7 +38,7 @@ export interface DiagnosisItem {
 export interface MedicalRecord {
   _id: string
   recordNo: string
-  type: 'outpatient' | 'admission' | 'prescription'
+  type: 'outpatient' | 'admission' | 'prescription' | 'exam'
   patientId: string
   patientName: string
   department: string
@@ -56,6 +56,7 @@ export interface MedicalRecord {
   signedAt?: string
   signedBy?: string
   visitedAt?: string
+  createdAt?: string
 }
 
 export interface Visit {
@@ -164,7 +165,19 @@ export interface DrugManual {
   precautions?: string
   fullText?: string
   source?: string
+  category?: string
   crawledAt?: string
+}
+
+/** 未知药品记录 */
+export interface UnknownDrug {
+  _id: string
+  drugName: string
+  count: number
+  doctorId?: string
+  doctorName?: string
+  patientName?: string
+  status: string
 }
 
 export interface DictionaryItem {

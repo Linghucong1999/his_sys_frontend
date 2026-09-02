@@ -412,6 +412,8 @@ onMounted(() => {
 .bb {
   font-size: 13.5px;
   line-height: 1.7;
+  word-break: break-all;
+  overflow-wrap: anywhere;
 }
 /* 处方笺版式 */
 .rx-pad {

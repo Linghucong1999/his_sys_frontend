@@ -28,6 +28,7 @@
         {{ c.label }}
       </div>
       <span class="tag tag-blue" style="margin-left: auto">共 {{ drugs.length }} 种药品</span>
+      <button class="btn btn-ghost btn-sm" @click="openUnknown">❓ 未知药品</button>
     </div>
     <div class="grid2">
       <!-- 左：药品列表 -->
@@ -69,17 +70,31 @@
       </div>
       <div v-else class="card right-card empty-card">← 从左侧选择药品查看说明书</div>
     </div>
+
+    <!-- 未知药品弹窗 -->
+    <ElDialog v-model="unknownDialogVisible" title="❓ 未知药品（医生开过但药库没有）" width="560px">
+      <div v-if="unknownDrugs.length === 0" class="unknown-empty">暂无未知药品</div>
+      <div v-for="d in unknownDrugs" :key="d._id" class="unknown-row">
+        <div class="tt">
+          <b>{{ d.drugName }}</b>
+          <small>被开具 {{ d.count }} 次 · {{ d.doctorName ?? '—' }} · 患者 {{ d.patientName ?? '—' }}</small>
+        </div>
+        <button class="btn btn-primary btn-sm" @click="onRegisterDrug(d)">注册入库</button>
+      </div>
+    </ElDialog>
   </section>
 </template>
 
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { fetchDrugManuals, fetchDrugCategories } from '@/api/misc'
-import { ElSelect, ElOption } from 'element-plus'
+import { fetchDrugManuals, fetchDrugCategories, fetchUnknownDrugs, registerDrug } from '@/api/misc'
+import { ElSelect, ElOption, ElDialog, ElMessageBox } from 'element-plus'
 import 'element-plus/es/components/select/style/css'
 import 'element-plus/es/components/option/style/css'
-import type { DrugManual } from '@/api/types'
+import 'element-plus/es/components/dialog/style/css'
+import 'element-plus/es/components/message-box/style/css'
+import type { DrugManual, UnknownDrug } from '@/api/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -122,6 +137,30 @@ function changeCategory(c: string): void {
   categoryFilter.value = c
   selected.value = null
   void load()
+}
+
+/** 未知药品（医生开过但药库没有） */
+const unknownDialogVisible = ref(false)
+const unknownDrugs = ref<UnknownDrug[]>([])
+
+async function openUnknown(): Promise<void> {
+  unknownDrugs.value = await fetchUnknownDrugs()
+  unknownDialogVisible.value = true
+}
+
+async function onRegisterDrug(d: UnknownDrug): Promise<void> {
+  try {
+    await registerDrug({ drugName: d.drugName })
+    unknownDrugs.value = unknownDrugs.value.filter((u) => u._id !== d._id)
+    await ElMessageBox.alert(
+      `「${d.drugName}」已注册入库，并按药理词根自动分类。可补充规格与说明书。`,
+      '注册成功',
+      { confirmButtonText: '知道了', type: 'success' }
+    )
+    void load()
+  } catch (e) {
+    await ElMessageBox.alert((e as Error).message, '注册失败', { confirmButtonText: '知道了', type: 'error' })
+  }
 }
 
 onMounted(() => {
@@ -272,5 +311,32 @@ onMounted(() => {
 }
 .cat-select {
   width: 200px;
+}
+.unknown-empty {
+  padding: 30px;
+  text-align: center;
+  color: var(--text-mute);
+  font-size: 12.5px;
+}
+.unknown-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+.unknown-row .tt {
+  flex: 1;
+  min-width: 0;
+}
+.unknown-row .tt b {
+  display: block;
+  font-size: 13.5px;
+}
+.unknown-row .tt small {
+  color: var(--text-mute);
+  font-size: 11.5px;
 }
 </style>

@@ -82,7 +82,10 @@
               <button class="btn btn-ghost btn-sm rx-del" @click="removeRxRow(i)">✕</button>
             </div>
             <button class="btn btn-ghost btn-sm" @click="addRxRow">＋ 添加药品</button>
-            <div v-if="legacyRxText" class="legacy-rx">历史处方（文本）：{{ legacyRxText }}</div>
+            <div v-if="form.prescriptionSummary" class="legacy-rx">
+              <div class="legacy-rx-title">📜 历次处方摘要（续写累积，含时间戳）</div>
+              <div class="legacy-rx-body">{{ form.prescriptionSummary }}</div>
+            </div>
           </div>
         </EmrBlock>
         <EmrBlock v-if="tab === 'exam'" label="检查申请">
@@ -179,7 +182,6 @@ import AiCopilotPanel from '@/components/AiCopilotPanel.vue'
 import type { DiagnosisItem, MedicalRecord, RxItem, Patient } from '@/api/types'
 import { buildRecordPrintHtml } from '@/utils/print'
 import PrintPreviewDialog from '@/components/PrintPreviewDialog.vue'
-import HisCombobox from '@/components/HisCombobox.vue'
 import Pagination from '@/components/Pagination.vue'
 import AutoTextarea from '@/components/AutoTextarea.vue'
 import { ElMessageBox, ElAutocomplete, ElSelect, ElOption, ElInput } from 'element-plus'
@@ -291,12 +293,6 @@ const rxSummary = computed(() =>
     .join('；')
 )
 
-/** 旧数据回退：无结构化条目时显示历史处方文本 */
-const legacyRxText = computed(() => {
-  if (validRxRows.value.length > 0) return ''
-  return form.value.prescriptionSummary ?? ''
-})
-
 const patient = computed(() => patientStore.current)
 const signed = computed(() => currentRecord.value?.signed ?? false)
 
@@ -332,7 +328,12 @@ async function loadIcd(): Promise<void> {
 async function loadRecord(): Promise<void> {
   if (!patient.value) return
   const records = await listRecords({ keyword: patient.value.name })
-  const latest = records.find((r) => r.type === 'outpatient' && !r.signed) ?? records[0] ?? null
+  // 复诊调档：优先取最近一次未签名门诊病历续写（历史处方已累积在摘要中）
+  const unsorted = records.filter((r) => r.type === 'outpatient')
+  const sorted = [...unsorted].sort(
+    (a, b) => new Date(b.createdAt ?? b.visitedAt ?? 0).getTime() - new Date(a.createdAt ?? a.visitedAt ?? 0).getTime()
+  )
+  const latest = sorted.find((r) => !r.signed) ?? sorted[0] ?? null
   currentRecord.value = latest
   if (latest) {
     form.value = {
@@ -364,6 +365,34 @@ function parseDiagnosis(text: string): DiagnosisItem[] {
     })
 }
 
+/** 处方摘要累积：复诊续写时保留历史处方，本次处方带时间戳追加（同一分钟内去重） */
+let appendedRxKey = ''
+
+function stampNow(): string {
+  const d = new Date()
+  const p = (n: number): string => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
+
+function buildSummaryWithHistory(): string {
+  const cur = rxSummary.value.trim()
+  const base = (form.value.prescriptionSummary ?? '').trim()
+  if (!cur) return base
+  const entry = `【${stampNow()} 处方】 ${cur}`
+  if (!base) {
+    appendedRxKey = entry
+    return entry
+  }
+  // 最后一段已含本次处方（自动保存重复触发）则不改
+  const lastLine = base.split('\n').pop() ?? ''
+  if (lastLine === entry || lastLine.endsWith(cur)) {
+    appendedRxKey = entry
+    return base
+  }
+  appendedRxKey = entry
+  return `${base}\n${entry}`
+}
+
 async function onSave(): Promise<void> {
   if (!patient.value) return
   busy.value = true
@@ -379,15 +408,14 @@ async function onSave(): Promise<void> {
       pastHistory: form.value.pastHistory,
       physicalExam: form.value.physicalExam,
       diagnosis: parseDiagnosis(form.value.diagnosisText),
-      prescriptionSummary: rxSummary.value || form.value.prescriptionSummary,
+      prescriptionSummary: buildSummaryWithHistory(),
       prescriptionItems: validRxRows.value,
       examRequest: form.value.examRequest
     }
     if (currentRecord.value && !currentRecord.value.signed) {
-      currentRecord.value = await saveRecord(payload).then(() => currentRecord.value)
-      // 后端 save 无 id 时新建；编辑已存在记录走 update
+      // 编辑已存在的未签名档案：更新而非新建（修复重复建档）
       const { updateRecord } = await import('@/api/emr')
-      currentRecord.value = await updateRecord(currentRecord.value!._id, payload)
+      currentRecord.value = await updateRecord(currentRecord.value._id, payload)
     } else {
       currentRecord.value = await saveRecord(payload)
     }
@@ -400,7 +428,8 @@ async function onSave(): Promise<void> {
 }
 
 async function onSign(): Promise<void> {
-  if (!currentRecord.value) {
+  if (!currentRecord.value || !signed.value) {
+    // 签名前先把最新内容保存入库（含处方摘要累积）
     await onSave()
   }
   if (!currentRecord.value) return
@@ -431,14 +460,15 @@ async function onSign(): Promise<void> {
   }
 }
 
-/** 打印当前病历：打开打印预览对话框（预览确认后打印） */
+/** 打印当前单据：按 tab 分流——病历/处方笺/检查申请单（预览确认后打印） */
 const previewVisible = ref(false)
 const previewHtml = ref('')
 const previewTitle = ref('')
 
 function onPrint(): void {
   if (!patient.value) return
-  const draft: MedicalRecord = {
+  const diagnosis = parseDiagnosis(form.value.diagnosisText)
+  const base: MedicalRecord = {
     _id: currentRecord.value?._id ?? 'draft',
     recordNo: currentRecord.value?.recordNo ?? '未归档',
     type: 'outpatient',
@@ -446,19 +476,52 @@ function onPrint(): void {
     patientName: patient.value.name,
     department: '呼吸内科',
     doctorName: '王医生',
-    diagnosis: parseDiagnosis(form.value.diagnosisText),
-    chiefComplaint: form.value.chiefComplaint,
-    presentIllness: form.value.presentIllness,
-    pastHistory: form.value.pastHistory,
-    physicalExam: form.value.physicalExam,
-    prescriptionSummary: form.value.prescriptionSummary,
-    examRequest: form.value.examRequest,
+    diagnosis,
     signed: signed.value,
     signedBy: currentRecord.value?.signedBy,
     signedAt: currentRecord.value?.signedAt
   }
-  previewHtml.value = buildRecordPrintHtml(draft, patient.value)
-  previewTitle.value = `门诊病历 · ${patient.value.name}`
+  if (tab.value === 'prescription') {
+    // 处方笺：结构化条目优先，回退摘要文本
+    const draft: MedicalRecord = {
+      ...base,
+      type: 'prescription',
+      prescriptionItems: validRxRows.value.map((r) => ({
+        drug: r.drug,
+        spec: r.spec,
+        dose: r.dose,
+        frequency: r.frequency,
+        route: r.route,
+        duration: r.duration
+      })),
+      prescriptionSummary: rxSummary.value
+    }
+    previewHtml.value = buildRecordPrintHtml(draft, patient.value)
+    previewTitle.value = `处方笺 · ${patient.value.name}`
+  } else if (tab.value === 'exam') {
+    // 检查申请单
+    const draft: MedicalRecord = {
+      ...base,
+      type: 'exam',
+      examRequest: form.value.examRequest
+    }
+    previewHtml.value = buildRecordPrintHtml(draft, patient.value)
+    previewTitle.value = `检查申请单 · ${patient.value.name}`
+  } else {
+    // 门诊病历
+    const draft: MedicalRecord = {
+      ...base,
+      type: 'outpatient',
+      chiefComplaint: form.value.chiefComplaint,
+      presentIllness: form.value.presentIllness,
+      pastHistory: form.value.pastHistory,
+      physicalExam: form.value.physicalExam,
+      prescriptionSummary: form.value.prescriptionSummary,
+      examRequest: form.value.examRequest
+    }
+    previewHtml.value = buildRecordPrintHtml(draft, patient.value)
+    previewTitle.value = `门诊病历 · ${patient.value.name}`
+  }
   previewVisible.value = true
 }
 
@@ -666,6 +729,18 @@ watch(
   border: 1px dashed var(--border-strong);
   border-radius: 8px;
   padding: 8px 10px;
+}
+.legacy-rx-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-2);
+  margin-bottom: 4px;
+}
+.legacy-rx-body {
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  line-height: 1.7;
 }
 @media (max-width: 1200px) {
   .p360 {

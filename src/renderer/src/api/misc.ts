@@ -1,5 +1,5 @@
 import request from './request'
-import type { DictionaryItem, SearchResultItem, Visit, DrugManual } from './types'
+import type { DictionaryItem, SearchResultItem, Visit, DrugManual, UnknownDrug } from './types'
 
 export function listDictionaries(category: string, keyword?: string): Promise<DictionaryItem[]> {
   return request.get(`/dictionaries/${category}`, { params: { keyword } })
@@ -13,6 +13,16 @@ export function fetchDrugManuals(keyword?: string, source?: string, category?: s
 /** 药理分类列表 */
 export function fetchDrugCategories(): Promise<string[]> {
   return request.get('/drug-manuals/categories')
+}
+
+/** 未知药品列表（医生开过但药库中没有的） */
+export function fetchUnknownDrugs(): Promise<UnknownDrug[]> {
+  return request.get('/drug-manuals/unknown')
+}
+
+/** 注册新药入库（自动词根分类） */
+export function registerDrug(data: { drugName: string; spec?: string; category?: string; fullText?: string }): Promise<DrugManual> {
+  return request.post('/drug-manuals/register', data)
 }
 
 export function globalSearch(q: string, limit = 8): Promise<SearchResultItem[]> {

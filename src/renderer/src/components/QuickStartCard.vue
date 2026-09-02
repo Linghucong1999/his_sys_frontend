@@ -51,7 +51,18 @@
             档案号 {{ p.medicalRecordNo ?? p.empiId }}
           </div>
         </div>
-        <button class="btn btn-primary btn-sm" @click="onFollowup(p)">调档接诊</button>
+        <template v-if="p.pending && p.pending.length > 0">
+          <button
+            v-for="(item, i) in p.pending"
+            :key="i"
+            class="btn btn-sm"
+            :class="i === 0 ? 'btn-primary' : 'btn-ghost'"
+            @click="onResume(p)"
+          >
+            {{ item }}
+          </button>
+        </template>
+        <button v-else class="btn btn-primary btn-sm" @click="onFollowup(p)">调档接诊</button>
       </div>
       <div v-if="patientStore.searchResults.length === 0" style="font-size: 11.5px; color: var(--text-mute)">
         💡 调档后自动带入上次诊断与历史处方，一键复制续方
@@ -63,7 +74,7 @@
 <script setup lang="ts">
 import { reactive, ref, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
-import { usePatientStore } from '@/stores/patient'
+import { usePatientStore, TAB_OF_PENDING } from '@/stores/patient'
 import HisSelect from '@/components/HisSelect.vue'
 import { ElMessageBox } from 'element-plus'
 import 'element-plus/es/components/message-box/style/css'
@@ -150,6 +161,13 @@ async function onFollowup(p: Patient): Promise<void> {
   } finally {
     loading.value = false
   }
+}
+
+/** 续写：接诊未完成，进入接诊并定位到缺失 tab */
+async function onResume(p: Patient): Promise<void> {
+  const pendingTab = p.pending?.length ? (TAB_OF_PENDING[p.pending[0]] ?? 'record') : 'record'
+  await patientStore.resume(p, pendingTab)
+  router.push('/p360')
 }
 
 // 预置复诊调档列表（对齐 UI 稿：显示已有患者档案）

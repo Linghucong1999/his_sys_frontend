@@ -7,13 +7,22 @@ interface PatientState {
   current: Patient | null
   visits: Visit[]
   searchResults: Patient[]
+  /** 进入接诊后自动定位的目标 tab（续写未完成项用） */
+  targetTab: string
+}
+
+export const TAB_OF_PENDING: Record<string, string> = {
+  未写病历: 'record',
+  未写处方: 'prescription',
+  未写检查: 'exam'
 }
 
 export const usePatientStore = defineStore('patient', {
   state: (): PatientState => ({
     current: null,
     visits: [],
-    searchResults: []
+    searchResults: [],
+    targetTab: ''
   }),
   actions: {
     /** 新建首诊：建档（EMPI 入口）→ 创建就诊 → 进入接诊 */
@@ -59,7 +68,22 @@ export const usePatientStore = defineStore('patient', {
         type: 'followup'
       })
       this.current = patient
+      this.targetTab = ''
       this.visits = await listVisitsByPatient(patient._id)
+    },
+
+    /** 续写：接诊未完成的患者不新建就诊，直接进入接诊并定位到缺失 tab */
+    async resume(patient: Patient, tab: string): Promise<void> {
+      this.current = patient
+      this.targetTab = tab
+      this.visits = await listVisitsByPatient(patient._id)
+    },
+
+    /** 进入接诊后消费目标 tab */
+    consumeTargetTab(): string {
+      const t = this.targetTab
+      this.targetTab = ''
+      return t
     },
 
     async load(patientId: string): Promise<void> {
@@ -75,6 +99,7 @@ export const usePatientStore = defineStore('patient', {
       this.current = null
       this.visits = []
       this.searchResults = []
+      this.targetTab = ''
     }
   }
 })

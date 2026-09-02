@@ -17,6 +17,9 @@
           <span v-if="form.pastHistory.includes('过敏')" class="tag tag-red">⚠ 过敏史</span>
           <span v-else class="tag tag-green">无过敏史</span>
         </div>
+        <div style="margin-top: 12px">
+          <button class="btn btn-ghost btn-sm" @click="router.push('/emr')">📋 返回病历列表</button>
+        </div>
         <div class="ai-sec" style="margin-top: 16px">就诊旅程</div>
         <PatientJourney :nodes="journeyNodes" />
       </div>
@@ -107,7 +110,24 @@
             档案号 {{ p.medicalRecordNo ?? p.empiId }}
           </div>
         </div>
-        <button class="btn btn-primary btn-sm" :disabled="followupBusy" @click="onFollowupFromList(p)">
+        <template v-if="p.pending && p.pending.length > 0">
+          <button
+            v-for="(item, i) in p.pending"
+            :key="i"
+            class="btn btn-sm pending-btn"
+            :class="i === 0 ? 'btn-primary' : 'btn-ghost'"
+            :disabled="followupBusy"
+            @click="onResumeFromList(p)"
+          >
+            {{ item }}
+          </button>
+        </template>
+        <button
+          v-else
+          class="btn btn-primary btn-sm"
+          :disabled="followupBusy"
+          @click="onFollowupFromList(p)"
+        >
           调档接诊
         </button>
       </div>
@@ -124,7 +144,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { usePatientStore } from '@/stores/patient'
+import { usePatientStore, TAB_OF_PENDING } from '@/stores/patient'
 import { listRecords, saveRecord, signRecord } from '@/api/emr'
 import { listDictionaries } from '@/api/misc'
 import { fetchPatientPage } from '@/api/patients'
@@ -359,10 +379,21 @@ async function onFollowupFromList(p: Patient): Promise<void> {
   }
 }
 
+/** 续写：接诊未完成，进入接诊并定位到缺失 tab */
+async function onResumeFromList(p: Patient): Promise<void> {
+  const pendingTab = p.pending?.length ? (TAB_OF_PENDING[p.pending[0]] ?? 'record') : 'record'
+  await patientStore.resume(p, pendingTab)
+}
+
 onMounted(() => {
   if (!patientStore.current) {
     void loadAllPatients()
   } else {
+    // 续写跳转：应用目标 tab
+    const target = patientStore.consumeTargetTab()
+    if (target) {
+      tab.value = target as typeof tab.value
+    }
     void loadIcd()
     void loadRecord()
   }

@@ -25,6 +25,8 @@ export interface Patient {
   address?: string
   medicalRecordNo?: string
   insuranceType?: string
+  /** 待完成接诊项（未写病历/未写处方/未写检查） */
+  pending?: string[]
   status?: string
 }
 

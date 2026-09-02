@@ -65,7 +65,14 @@ import { reactive, ref, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePatientStore } from '@/stores/patient'
 import HisSelect from '@/components/HisSelect.vue'
+import { ElMessageBox } from 'element-plus'
+import 'element-plus/es/components/message-box/style/css'
 import type { Patient } from '@/api/types'
+
+/** 统一错误弹窗 */
+function alertError(msg: string, title = '操作失败'): void {
+  void ElMessageBox.alert(msg, title, { confirmButtonText: '知道了', type: 'error' })
+}
 
 const GENDER_OPTIONS = [
   { value: '女', label: '女' },
@@ -99,7 +106,7 @@ const searchLoading = ref(false)
 
 async function onFirstVisit(): Promise<void> {
   if (!firstForm.name.trim()) {
-    window.alert('请输入患者姓名')
+    alertError('请输入患者姓名')
     return
   }
   loading.value = true
@@ -115,7 +122,7 @@ async function onFirstVisit(): Promise<void> {
     })
     router.push('/p360')
   } catch (e) {
-    window.alert((e as Error).message)
+    alertError((e as Error).message)
   } finally {
     loading.value = false
   }
@@ -127,7 +134,7 @@ async function onSearch(): Promise<void> {
   try {
     await patientStore.search(searchKw.value.trim())
   } catch (e) {
-    window.alert((e as Error).message)
+    alertError((e as Error).message)
   } finally {
     searchLoading.value = false
   }
@@ -139,7 +146,7 @@ async function onFollowup(p: Patient): Promise<void> {
     await patientStore.followup(p)
     router.push('/p360')
   } catch (e) {
-    window.alert((e as Error).message)
+    alertError((e as Error).message)
   } finally {
     loading.value = false
   }

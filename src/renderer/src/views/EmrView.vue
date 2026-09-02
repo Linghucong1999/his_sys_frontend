@@ -106,7 +106,14 @@ import { fetchPatient } from '@/api/patients'
 import { buildRecordPrintHtml } from '@/utils/print'
 import PrintPreviewDialog from '@/components/PrintPreviewDialog.vue'
 import Pagination from '@/components/Pagination.vue'
+import { ElMessageBox } from 'element-plus'
+import 'element-plus/es/components/message-box/style/css'
 import type { MedicalRecord } from '@/api/types'
+
+/** 统一错误弹窗 */
+function alertError(msg: string, title = '操作失败'): void {
+  void ElMessageBox.alert(msg, title, { confirmButtonText: '知道了', type: 'error' })
+}
 
 const router = useRouter()
 const route = useRoute()
@@ -219,7 +226,7 @@ async function onPrint(): Promise<void> {
     previewTitle.value = `${kind} · ${selected.value.patientName}`
     previewVisible.value = true
   } catch (e) {
-    window.alert((e as Error).message)
+    alertError((e as Error).message)
   } finally {
     busy.value = false
   }

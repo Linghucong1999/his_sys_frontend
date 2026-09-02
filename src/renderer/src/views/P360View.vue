@@ -142,6 +142,11 @@ import AutoTextarea from '@/components/AutoTextarea.vue'
 import { ElMessageBox } from 'element-plus'
 import 'element-plus/es/components/message-box/style/css'
 
+/** 统一错误弹窗 */
+function alertError(msg: string, title = '操作失败'): void {
+  void ElMessageBox.alert(msg, title, { confirmButtonText: '知道了', type: 'error' })
+}
+
 const router = useRouter()
 const patientStore = usePatientStore()
 
@@ -348,7 +353,7 @@ async function onFollowupFromList(p: Patient): Promise<void> {
   try {
     await patientStore.followup(p)
   } catch (e) {
-    window.alert((e as Error).message)
+    alertError((e as Error).message)
   } finally {
     followupBusy.value = false
   }

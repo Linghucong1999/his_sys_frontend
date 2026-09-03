@@ -110,6 +110,9 @@ function recordSections(record: MedicalRecord, isExam: boolean): string[] {
     const dx = record.diagnosis.map((d) => (d.code ? `${d.code} ${d.name}` : d.name)).join('；')
     sections.push(`<div class="sec"><div class="sec-h">临床诊断</div><div class="sec-b strong">${esc(dx)}</div></div>`)
   }
+  if (!isExam && record.prescriptionSummary) {
+    sections.push(`<div class="sec"><div class="sec-h">处方摘要</div><div class="sec-b">${esc(record.prescriptionSummary)}</div></div>`)
+  }
   if (isExam) {
     sections.push(`<div class="sec"><div class="sec-h">检查项目</div><div class="sec-b strong">${esc(record.examRequest?.trim() || '（未填写检查项目）')}</div></div>`)
   }

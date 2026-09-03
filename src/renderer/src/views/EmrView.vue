@@ -143,7 +143,10 @@
         <div class="prev-ft">
           <button class="btn btn-ghost" :disabled="busy || !selected" @click="onPrint">🖨 打印</button>
           <button class="btn btn-ghost">复制为新病历模板</button>
-          <button v-if="selected && !selected.signed" class="btn btn-primary" :disabled="busy" @click="onSign">🔏 CA 签名</button>
+          <button v-if="selected && !selected.signed && canSign" class="btn btn-primary" :disabled="busy" @click="onSign">🔏 CA 签名</button>
+          <button v-else-if="selected && !selected.signed && !canSign" class="btn btn-warn" @click="goFix">
+            ⚠ 缺{{ signMissing.join('、') }} · 去补充
+          </button>
           <button v-else class="btn btn-primary" @click="router.push('/p360')">🔁 复诊续方</button>
         </div>
       </div>
@@ -160,6 +163,7 @@ import { useWindowSize } from '@vueuse/core'
 import { fetchRecordPage, signRecord } from '@/api/emr'
 import { fetchPatient } from '@/api/patients'
 import { buildRecordPrintHtml } from '@/utils/print'
+import { emitDataChanged } from '@/utils/events'
 import PrintPreviewDialog from '@/components/PrintPreviewDialog.vue'
 import Pagination from '@/components/Pagination.vue'
 import { ElMessageBox } from 'element-plus'
@@ -285,6 +289,35 @@ const rxDiagnosis = computed(() =>
   selected.value?.diagnosis.map((d) => (d.code ? `${d.code} ${d.name}` : d.name)).join('；') ?? ''
 )
 
+/** 当前选中文书是否满足 CA 签名三要素（与后端校验一致） */
+const signMissing = computed<string[]>(() => {
+  if (!selected.value) return []
+  const r = selected.value
+  if (r.type === 'prescription') {
+    const hasRx = !!(r.prescriptionSummary?.trim() || (r.prescriptionItems ?? []).length > 0)
+    return hasRx ? [] : ['处方']
+  }
+  const missing: string[] = []
+  if (!r.chiefComplaint?.trim()) missing.push('主诉')
+  if (!(r.prescriptionSummary?.trim() || (r.prescriptionItems ?? []).length > 0)) missing.push('处方')
+  if (!r.examRequest?.trim()) missing.push('检查申请')
+  return missing
+})
+
+const canSign = computed(() => !selected.value?.signed && signMissing.value.length === 0)
+
+/** 缺项补齐：跳转患者 360 定位到缺失 tab */
+async function goFix(): Promise<void> {
+  if (!selected.value) return
+  const target = signMissing.value[0]
+  const { usePatientStore } = await import('@/stores/patient')
+  const patientStore = usePatientStore()
+  await patientStore.load(selected.value.patientId)
+  if (target === '处方') patientStore.setTargetTab?.('prescription')
+  else if (target === '检查申请') patientStore.setTargetTab?.('exam')
+  router.push('/p360')
+}
+
 async function load(): Promise<void> {
   const result = await fetchRecordPage({
     keyword: keyword.value.trim() || undefined,
@@ -356,6 +389,7 @@ async function onSign(): Promise<void> {
   busy.value = true
   try {
     await signRecord(selected.value._id)
+    emitDataChanged()
     await load()
   } finally {
     busy.value = false

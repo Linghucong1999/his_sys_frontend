@@ -53,11 +53,12 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { onClickOutside } from '@vueuse/core'
 import { useUserStore } from '@/stores/user'
 import { useTodoStore } from '@/stores/todo'
+import { onDataChanged } from '@/utils/events'
 import CommandPalette from '@/components/CommandPalette.vue'
 
 const userStore = useUserStore()
@@ -75,6 +76,9 @@ onClickOutside(userMenuRef, () => (userMenuOpen.value = false))
 
 onMounted(() => {
   if (!todoStore.summary) void todoStore.load()
+  // 签名等操作后：消息数与待办列表同步刷新
+  const off = onDataChanged(() => void todoStore.load())
+  onUnmounted(off)
 })
 
 /** 🔏 CA 签名：跳转 EMR 待签名列表 */

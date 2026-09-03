@@ -86,6 +86,11 @@ export const usePatientStore = defineStore('patient', {
       return t
     },
 
+    /** 设置进入 P360 时定位的 tab（补写处方/检查用） */
+    setTargetTab(tab: string): void {
+      this.targetTab = tab
+    },
+
     async load(patientId: string): Promise<void> {
       this.current = null
       this.visits = []

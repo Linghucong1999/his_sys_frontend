@@ -181,6 +181,7 @@ import EmrBlock from '@/components/EmrBlock.vue'
 import AiCopilotPanel from '@/components/AiCopilotPanel.vue'
 import type { DiagnosisItem, MedicalRecord, RxItem, Patient } from '@/api/types'
 import { buildRecordPrintHtml } from '@/utils/print'
+import { emitDataChanged } from '@/utils/events'
 import PrintPreviewDialog from '@/components/PrintPreviewDialog.vue'
 import Pagination from '@/components/Pagination.vue'
 import AutoTextarea from '@/components/AutoTextarea.vue'
@@ -481,6 +482,7 @@ async function onSign(): Promise<void> {
   try {
     currentRecord.value = await signRecord(currentRecord.value._id)
     savedTip.value = '已 CA 签名'
+    emitDataChanged()
   } catch (e) {
     await ElMessageBox.alert((e as Error).message, '签名失败', {
       confirmButtonText: '知道了',

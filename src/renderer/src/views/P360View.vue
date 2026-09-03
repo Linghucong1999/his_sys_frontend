@@ -281,8 +281,9 @@ function removeRxRow(i: number): void {
 const validRxRows = computed(() => rxRows.value.filter((r) => r.drug.trim()))
 
 /** 生成兼容文本摘要：药名 剂量 途径 频次 ×疗程 */
-const rxSummary = computed(() =>
-  validRxRows.value
+function rxSummaryOf(rows: RxItem[]): string {
+  return rows
+    .filter((r) => r.drug.trim())
     .map((r) => {
       const dose = r.dose ?? r.spec ?? ''
       const route = r.route ? ` ${r.route}` : ''
@@ -291,12 +292,17 @@ const rxSummary = computed(() =>
       return `${r.drug} ${dose}${route}${freq}${dur}`.replace(/\s+/g, ' ').trim()
     })
     .join('；')
-)
+}
+
+const rxSummary = computed(() => rxSummaryOf(rxRows.value))
+
+/** 复诊调档回填的原始处方文本：与回填内容相同时不重复写入处方摘要 */
+let baselineRx = ''
 
 const patient = computed(() => patientStore.current)
 const signed = computed(() => currentRecord.value?.signed ?? false)
 
-/** 就诊旅程五节点（对齐 UI 稿演示流程，标注接诊医生） */
+/** 就诊旅程节点（CA 签名即流程结束，无处方审核/药房环节） */
 const journeyNodes = computed<JourneyNode[]>(() => {
   const today = patientStore.visits.find((v) => {
     const d = new Date(v.visitedAt)
@@ -310,9 +316,11 @@ const journeyNodes = computed<JourneyNode[]>(() => {
   return [
     { time: fmtT(base), label: `建档 · 接诊（${doctor}）`, state: 'done' },
     { time: fmtT(new Date(base.getTime() + 18 * 60000)), label: '体征录入 · T 38.2℃ P 92', state: 'done' },
-    { time: fmtT(new Date(base.getTime() + 54 * 60000)), label: '接诊 · 病历已 CA 签名', state: signed.value ? 'done' : 'current' },
-    { time: signed.value ? fmtT(new Date(base.getTime() + 70 * 60000)) : '进行中', label: '处方审核 · 待 CA 签名', state: 'current' },
-    { time: '待进行', label: '缴费 · 药房取药', state: 'todo' }
+    {
+      time: signed.value ? fmtT(new Date(base.getTime() + 54 * 60000)) : '进行中',
+      label: signed.value ? '接诊 · 病历已 CA 签名 · 流程结束' : '接诊 · 病历待 CA 签名',
+      state: signed.value ? 'done' : 'current'
+    }
   ]
 })
 
@@ -328,29 +336,48 @@ async function loadIcd(): Promise<void> {
 async function loadRecord(): Promise<void> {
   if (!patient.value) return
   const records = await listRecords({ keyword: patient.value.name })
-  // 复诊调档：优先取最近一次未签名门诊病历续写（历史处方已累积在摘要中）
   const unsorted = records.filter((r) => r.type === 'outpatient')
   const sorted = [...unsorted].sort(
     (a, b) => new Date(b.createdAt ?? b.visitedAt ?? 0).getTime() - new Date(a.createdAt ?? a.visitedAt ?? 0).getTime()
   )
-  const latest = sorted.find((r) => !r.signed) ?? sorted[0] ?? null
+  // 复诊调档：优先取"进行中就诊"关联的未签名病历续写；
+  // 其次取最近已签名病历（复诊续方）；最后兜底取最近门诊病历（避免历史病历查不到时空白）
+  const activeVisitIds = patientStore.visits.filter((v) => v.status === 'in_progress').map((v) => v._id)
+  const activeUnsigned = sorted.find((r) => !r.signed && r.visitId && activeVisitIds.includes(r.visitId))
+  const latest = activeUnsigned ?? sorted.find((r) => r.signed) ?? sorted[0] ?? null
   currentRecord.value = latest
-  if (latest) {
+  if (!latest) {
+    // 无历史病历：重置为空白表单，避免残留上一个患者的病历/处方信息
     form.value = {
-      chiefComplaint: latest.chiefComplaint ?? '',
-      presentIllness: latest.presentIllness ?? '',
-      pastHistory: latest.pastHistory ?? '',
-      physicalExam: latest.physicalExam ?? '',
-      diagnosisText: latest.diagnosis?.map((d) => `${d.code} ${d.name}`).join('；') ?? '',
-      prescriptionSummary: latest.prescriptionSummary ?? '',
-      examRequest: latest.examRequest ?? ''
+      chiefComplaint: '',
+      presentIllness: '',
+      pastHistory: '',
+      physicalExam: '',
+      diagnosisText: '',
+      prescriptionSummary: '',
+      examRequest: ''
     }
-    // 处方回填：优先结构化条目
-    if (latest.prescriptionItems && latest.prescriptionItems.length > 0) {
-      rxRows.value = latest.prescriptionItems.map((r) => ({ ...r }))
-    } else {
-      rxRows.value = [{ drug: '' }]
-    }
+    rxRows.value = [{ drug: '' }]
+    baselineRx = ''
+    return
+  }
+  form.value = {
+    chiefComplaint: latest.chiefComplaint ?? '',
+    presentIllness: latest.presentIllness ?? '',
+    pastHistory: latest.pastHistory ?? '',
+    physicalExam: latest.physicalExam ?? '',
+    diagnosisText: latest.diagnosis?.map((d) => `${d.code} ${d.name}`).join('；') ?? '',
+    prescriptionSummary: latest.prescriptionSummary ?? '',
+    examRequest: latest.examRequest ?? ''
+  }
+  // 处方回填：优先结构化条目
+  if (latest.prescriptionItems && latest.prescriptionItems.length > 0) {
+    rxRows.value = latest.prescriptionItems.map((r) => ({ ...r }))
+    // 记录回填基线：医生未改动时不把旧处方重复追加进摘要
+    baselineRx = rxSummaryOf(rxRows.value)
+  } else {
+    rxRows.value = [{ drug: '' }]
+    baselineRx = ''
   }
 }
 
@@ -378,6 +405,8 @@ function buildSummaryWithHistory(): string {
   const cur = rxSummary.value.trim()
   const base = (form.value.prescriptionSummary ?? '').trim()
   if (!cur) return base
+  // 复诊调档回填后未改动：不把旧处方重复追加进摘要
+  if (baselineRx && cur === baselineRx) return base
   const entry = `【${stampNow()} 处方】 ${cur}`
   if (!base) {
     appendedRxKey = entry
@@ -398,11 +427,13 @@ async function onSave(): Promise<void> {
   busy.value = true
   errorMsg.value = ''
   try {
+    const activeVisit = patientStore.visits.find((v) => v.status === 'in_progress')
     const payload = {
       patientId: patient.value._id,
       patientName: patient.value.name,
       type: 'outpatient' as const,
       department: '呼吸内科',
+      visitId: activeVisit?._id,
       chiefComplaint: form.value.chiefComplaint,
       presentIllness: form.value.presentIllness,
       pastHistory: form.value.pastHistory,

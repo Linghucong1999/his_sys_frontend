@@ -1,5 +1,5 @@
 import request from './request'
-import type { DictionaryItem, SearchResultItem, Visit, DrugManual, UnknownDrug } from './types'
+import type { DictionaryItem, SearchResultItem, Visit, DrugManual, UnknownDrug, RegionTreeNode } from './types'
 
 export function listDictionaries(category: string, keyword?: string): Promise<DictionaryItem[]> {
   return request.get(`/dictionaries/${category}`, { params: { keyword } })
@@ -23,6 +23,11 @@ export function fetchUnknownDrugs(): Promise<UnknownDrug[]> {
 /** 注册新药入库（自动词根分类） */
 export function registerDrug(data: { drugName: string; spec?: string; category?: string; fullText?: string }): Promise<DrugManual> {
   return request.post('/drug-manuals/register', data)
+}
+
+/** 省市区三级树（建档住址级联选择用） */
+export function fetchRegions(): Promise<RegionTreeNode[]> {
+  return request.get('/regions')
 }
 
 export function globalSearch(q: string, limit = 8): Promise<SearchResultItem[]> {

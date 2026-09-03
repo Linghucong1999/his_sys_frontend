@@ -180,6 +180,13 @@ export interface UnknownDrug {
   status: string
 }
 
+/** 行政区划节点（省市区三级树） */
+export interface RegionTreeNode {
+  value: string
+  label: string
+  children?: RegionTreeNode[]
+}
+
 export interface DictionaryItem {
   _id: string
   category: string

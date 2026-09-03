@@ -23,7 +23,16 @@
         >
           <ElOption v-for="o in INSURANCE_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
         </ElSelect>
-        <input v-model="firstForm.address" class="inp" placeholder="住址（常住地址）" />
+        <ElCascader
+          v-model="addressPath"
+          class="his-ep-select"
+          :options="regions"
+          :props="{ expandTrigger: 'hover' }"
+          placeholder="省 / 市 / 区（可输入搜索）"
+          filterable
+          clearable
+        />
+        <input v-model="detailAddress" class="inp" placeholder="详细地址（街道/门牌号）" />
         <textarea v-model="firstForm.chiefComplaint" class="inp" placeholder="主诉（一句话）"></textarea>
         <button class="btn btn-primary" :disabled="loading" @click="onFirstVisit">创建档案并接诊 →</button>
       </div>
@@ -76,11 +85,14 @@
 import { reactive, ref, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePatientStore, TAB_OF_PENDING } from '@/stores/patient'
-import { ElMessageBox, ElSelect, ElOption } from 'element-plus'
+import { ElMessageBox, ElSelect, ElOption, ElCascader } from 'element-plus'
 import 'element-plus/es/components/message-box/style/css'
 import 'element-plus/es/components/select/style/css'
 import 'element-plus/es/components/option/style/css'
-import type { Patient } from '@/api/types'
+import 'element-plus/es/components/cascader/style/css'
+import { fetchRegions } from '@/api/misc'
+import type { Patient, RegionTreeNode } from '@/api/types'
+import { onMounted } from 'vue'
 
 /** 统一错误弹窗 */
 function alertError(msg: string, title = '操作失败'): void {
@@ -110,8 +122,38 @@ const firstForm = reactive({
   gender: '',
   insuranceType: '',
   age: '',
-  address: '',
   chiefComplaint: ''
+})
+
+/** 住址：省市区级联 + 详细地址 */
+const regions = ref<RegionTreeNode[]>([])
+const addressPath = ref<string[]>([])
+const detailAddress = ref('')
+
+function addressText(): string {
+  const parts = regionPathToText(addressPath.value)
+  const detail = detailAddress.value.trim()
+  return [parts, detail].filter(Boolean).join(' ')
+}
+
+/** 地址路径 → 文本（如 ['11','1101','110101'] → 北京市/市辖区/东城区） */
+function regionPathToText(path: string[]): string {
+  if (!path.length) return ''
+  let list: RegionTreeNode[] = regions.value
+  const parts: string[] = []
+  for (const code of path) {
+    const hit = list.find((n) => n.value === code)
+    if (!hit) break
+    parts.push(hit.label)
+    list = hit.children ?? []
+  }
+  return parts.join('/')
+}
+
+onMounted(() => {
+  void fetchRegions().then((list) => {
+    regions.value = list
+  })
 })
 
 const searchKw = ref('')
@@ -130,7 +172,7 @@ async function onFirstVisit(): Promise<void> {
       gender: firstForm.gender || undefined,
       insuranceType: firstForm.insuranceType || undefined,
       age: firstForm.age ? Number(firstForm.age) : undefined,
-      address: firstForm.address.trim() || undefined,
+      address: addressText() || undefined,
       chiefComplaint: firstForm.chiefComplaint.trim() || undefined
     })
     router.push('/p360')

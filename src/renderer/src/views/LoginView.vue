@@ -42,7 +42,6 @@
           {{ loading ? '登录中…' : '登 录 →' }}
         </button>
         <div class="login-tip">
-          演示账号：D1027 / 123456（医生）· admin / admin123（管理员）<br />
           登录即代表同意《电子签名使用协议》
         </div>
       </div>
@@ -58,8 +57,8 @@ import { useUserStore } from '@/stores/user'
 const router = useRouter()
 const userStore = useUserStore()
 
-const username = ref('D1027')
-const password = ref('123456')
+const username = ref('')
+const password = ref('')
 const loading = ref(false)
 const errorMsg = ref('')
 

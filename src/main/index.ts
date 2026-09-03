@@ -64,8 +64,8 @@ function registerPrintHandler(): void {
     return (await getPrintWindow().webContents.getPrintersAsync()).map((p) => ({
       name: p.name,
       displayName: p.displayName,
-      status: p.status,
-      isDefault: p.isDefault
+      status: (p as unknown as { status?: number }).status ?? 0,
+      isDefault: (p as unknown as { isDefault?: boolean }).isDefault ?? false
     }))
   })
 

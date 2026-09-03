@@ -4,6 +4,7 @@
 # electron-vite build output
 /out
 /dist
+/dist_package
 
 # environment
 .env

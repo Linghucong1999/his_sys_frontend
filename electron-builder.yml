@@ -1,0 +1,24 @@
+appId: com.his.workstation
+productName: HIS医生工作站
+copyright: Copyright © 2026
+directories:
+  buildResources: build
+  output: dist_package
+files:
+  - out/**/*
+  - package.json
+asar: true
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  perMachine: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: HIS医生工作站
+  artifactName: ${productName}-${version}-setup.${ext}
+publish: null

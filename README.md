@@ -8,7 +8,7 @@
 |---|---|
 | 桌面外壳 | Electron + electron-vite |
 | 框架 | Vue 3（TypeScript，组合式 API） |
-| UI 体系 | **UI 稿直译的自研视觉组件**（双主题 CSS 变量 + 玻璃拟态，无第三方组件库依赖） |
+| UI 体系 | 自研视觉组件（双主题 CSS 变量 + 玻璃拟态）+ Element Plus 按需引入（select/option/cascader/autocomplete/input/message-box/dialog） |
 | 工具库 | VueUse（useDark 深色模式，@vueuse/core） |
 | 状态管理 | Pinia |
 | 路由 | Vue Router 4（hash 模式，适配桌面端本地文件加载） |
@@ -39,6 +39,7 @@
 │           ├── layouts/GlassShell.vue        # 玻璃拟态外壳（导航+顶栏+视图区）
 │           ├── components/     # IconNav/TopBar/CommandPalette/StatCard/Sparkline/
 │           │                   # PatientJourney/EmrBlock/AiCopilotPanel/QuickStartCard
+│           ├── utils/print.ts  # 打印文档生成：病历/检查申请/处方笺（医院版式：费别/处方编号/签名栏/费用栏）
 │           └── views/          # Login/Workbench/P360/Inpatient/Emr/Consultation/Drugs
 ```
 
@@ -48,11 +49,11 @@
 |---|---|---|
 | 登录 | 工号+密码登录，RBAC 角色展示 | `POST /api/auth/login` |
 | 智能工作台 | 问候+统计卡+快速开始（新建首诊/复诊调档）+待办聚合+快捷入口 | `GET /api/dashboard/*`、`POST /api/patients`、`POST /api/outpatient/visits` |
-| 患者 360° | 患者卡+就诊旅程、区块化病历编辑（ICD-10 智能匹配）、CA 签名、AI 辅助面板 | `GET/POST /api/emr/records`、`GET /api/dictionaries/icd10` |
+| 患者 360° | 患者卡+就诊旅程（签名即结束）、区块化病历编辑（ICD-10 智能匹配）、处方表单化（药品联想）、处方摘要带时间戳累积续写、CA 签名、按 tab 打印分流（病历/处方笺/检查申请单） | `GET/POST /api/emr/records`、`GET /api/dictionaries/icd10` |
 | 住院工作站 | 病区筛选、床位卡片网格、长期/临时医嘱、停嘱 | `GET /api/inpatient/*` |
-| 电子病历 | 病历/处方列表（筛选）、预览、CA 签名、打印 | `GET /api/emr/records` |
+| 电子病历 | 患者聚合列表 + 门诊病历/处方/入院记录三 tab（切 tab 不刷新列表）、多次就诊日期横滑选单、CA 签名、打印 | `GET /api/emr/records/page` |
 | 会诊管理 | 会诊列表（待响应/进行中）、发起会诊、响应、催办 | `GET/POST /api/consultations` |
-| 药品说明书 | 药品搜索、厂家与说明书全文展示（说明书库 drugmanuals） | `GET /api/drug-manuals` |
+| 药品说明书 | 药品搜索、药理分类下拉筛选、来源筛选（基药/集采/有说明书）、未知药品注册入库（自动词根分类）、说明书全文展示 | `GET /api/drug-manuals`、`GET /api/drug-manuals/categories`、`POST /api/drug-manuals/register` |
 | Cmd+K | 患者调档/病历/药品/命令聚合搜索（药品结果跳转说明书页） | `GET /api/search?q=` |
 | 深色模式 | 底部导航一键切换，localStorage 持久化 | — |
 

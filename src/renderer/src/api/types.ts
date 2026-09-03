@@ -57,6 +57,7 @@ export interface MedicalRecord {
   signedBy?: string
   visitedAt?: string
   createdAt?: string
+  doctorUsername?: string
 }
 
 export interface Visit {

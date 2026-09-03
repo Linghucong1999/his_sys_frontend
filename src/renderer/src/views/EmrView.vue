@@ -14,57 +14,78 @@
       <div class="chip" :class="{ active: filter === 'unsigned' }" @click="changeFilter('unsigned')">待签名</div>
       <div class="chip" :class="{ active: filter === 'signed' }" @click="changeFilter('signed')">已签名</div>
       <div class="chip" :class="{ active: filter === 'recent' }" @click="changeFilter('recent')">近 30 天 ▾</div>
-      <span class="sep"></span>
-      <div class="chip" :class="{ active: typeFilter === 'all' }" @click="changeTypeFilter('all')">全部类型</div>
-      <div class="chip" :class="{ active: typeFilter === 'outpatient' }" @click="changeTypeFilter('outpatient')">门诊病历</div>
-      <div class="chip" :class="{ active: typeFilter === 'prescription' }" @click="changeTypeFilter('prescription')">💊 处方</div>
-      <div class="chip" :class="{ active: typeFilter === 'admission' }" @click="changeTypeFilter('admission')">入院记录</div>
-      <span class="tag tag-blue" style="margin-left: auto">共 {{ total }} 条</span>
+      <span class="tag tag-blue" style="margin-left: auto">共 {{ patientGroups.length }} 位患者</span>
     </div>
 
     <!-- 左右模块随视窗高度自适应，内部滚动 -->
     <div class="grid2">
-      <!-- 左侧：病历列表（分页） -->
+      <!-- 左侧：患者列表（同一患者聚合，不随类型刷新） -->
       <div class="card left-card">
         <div class="emr-list">
           <div
-            v-for="r in records"
-            :key="r._id"
+            v-for="g in patientGroups"
+            :key="g.patientId"
             class="emr-item"
-            :class="{ sel: selected?._id === r._id }"
-            @click="selected = r"
+            :class="{ sel: activePatientId === g.patientId }"
+            @click="selectPatient(g.patientId)"
           >
-            <div class="ed">{{ fmt(r.visitedAt) }}<br /><small>{{ isToday(r.visitedAt) ? '今日' : '' }}</small></div>
+            <div class="ed">{{ fmt(g.latestAt) }}<br /><small>{{ isToday(g.latestAt) ? '今日' : '' }}</small></div>
             <div class="tt" style="flex: 1; min-width: 0">
-              <b style="font-size: 13px">{{ r.patientName }} · {{ r.diagnosis[0]?.name ?? '—' }}</b>
+              <b style="font-size: 13px">{{ g.patientName }} · {{ g.latestDiagnosis }}</b>
               <div style="font-size: 11.5px; color: var(--text-mute); margin-top: 1px">
-                {{ r.type === 'prescription' ? '处方' : r.type === 'admission' ? '入院记录' : '门诊病历' }} · {{ r.department }}
+                门诊 {{ g.outpatientCount }} · 处方 {{ g.prescriptionCount }} · 入院 {{ g.admissionCount }}
               </div>
             </div>
-            <span class="tag" :class="r.signed ? 'tag-green' : 'tag-orange'">{{ r.signed ? '已签名' : '待签名' }}</span>
+            <span v-if="g.unsignedCount > 0" class="tag tag-orange">{{ g.unsignedCount }} 待签</span>
+            <span v-else class="tag tag-green">已签</span>
           </div>
-          <div v-if="records.length === 0" class="empty">暂无病历</div>
+          <div v-if="patientGroups.length === 0" class="empty">暂无病历</div>
         </div>
         <Pagination :page="page" :total="total" :page-size="pageSize" @change="goPage" />
       </div>
 
-      <!-- 右侧：病历预览（随高度滚动） -->
-      <div v-if="selected" class="card right-card">
+      <!-- 右侧：患者详情（门诊病历 / 处方 / 入院记录 三个 tab，切换不刷新列表） -->
+      <div v-if="activePatient" class="card right-card">
         <div class="prev-hd">
-          <b style="font-size: 15px">
-            {{ selected.type === 'prescription' ? '处方' : selected.type === 'admission' ? '入院记录' : '门诊病历' }} · {{ selected.patientName }}
-          </b>
-          <span class="tag tag-blue">{{ selected.recordNo }}</span>
-          <span class="tag" :class="selected.signed ? 'tag-green' : 'tag-orange'">
+          <b style="font-size: 15px">{{ activePatient.patientName }} · {{ typeLabel(activeTab) }}</b>
+          <span class="tag tag-blue">{{ selected?.recordNo ?? '' }}</span>
+          <span v-if="selected" class="tag" :class="selected.signed ? 'tag-green' : 'tag-orange'">
             {{ selected.signed ? `🔏 已 CA 签名 ${selected.signedAt ? new Date(selected.signedAt).toLocaleString('zh-CN') : ''}` : '待签名' }}
           </span>
-          <span style="margin-left: auto; font-size: 11.5px; color: var(--text-mute)">
+          <span v-if="selected" style="margin-left: auto; font-size: 11.5px; color: var(--text-mute)">
             {{ fmtFull(selected.visitedAt) }} · {{ selected.doctorName }} · {{ selected.department }}
           </span>
         </div>
-        <div class="prev-body">
+        <!-- 患者内三个 tab：切换只换内容，不刷新患者列表 -->
+        <div class="ptabs">
+          <div
+            v-for="t in PATIENT_TABS"
+            :key="t.value"
+            class="ptab"
+            :class="{ active: activeTab === t.value }"
+            @click="activeTab = t.value; tabIndex = 0"
+          >
+            {{ t.label }}<span class="ptab-n">{{ tabCount(t.value) }}</span>
+          </div>
+        </div>
+        <!-- 同一 tab 内多次就诊：日期横滑选单（不换行、不挤压页面） -->
+        <div v-if="tabRecords.length > 1" class="visit-row-wrap">
+          <div class="visit-row">
+            <div
+              v-for="(r, i) in tabRecords"
+              :key="r._id"
+              class="visit-chip"
+              :class="{ active: tabIndex === i }"
+              @click="tabIndex = i"
+            >
+              {{ fmtFull(r.visitedAt) }}<span v-if="r.signed" class="dot-done"></span>
+            </div>
+          </div>
+          <span class="visit-count">共 {{ tabRecords.length }} 次</span>
+        </div>
+        <div v-if="selected" class="prev-body">
           <!-- 处方类型：处方笺版式 -->
-          <div v-if="selected.type === 'prescription'" class="rx-pad">
+          <div v-if="activeTab === 'prescription'" class="rx-pad">
             <div class="rx-title">处 方 笺</div>
             <div class="rx-meta">
               <span>姓名：{{ selected.patientName }}</span>
@@ -84,7 +105,7 @@
               <span v-else class="tag tag-orange">待签名</span>
             </div>
           </div>
-          <!-- 病历类型：区块版式 -->
+          <!-- 门诊/入院：区块版式 -->
           <template v-else>
             <div v-if="selected.chiefComplaint" class="block">
               <div class="bl">主诉</div>
@@ -118,13 +139,15 @@
             </div>
           </template>
         </div>
+        <div v-else class="empty">该患者暂无{{ typeLabel(activeTab) }}</div>
         <div class="prev-ft">
-          <button class="btn btn-ghost" :disabled="busy" @click="onPrint">🖨 打印</button>
+          <button class="btn btn-ghost" :disabled="busy || !selected" @click="onPrint">🖨 打印</button>
           <button class="btn btn-ghost">复制为新病历模板</button>
-          <button v-if="!selected.signed" class="btn btn-primary" :disabled="busy" @click="onSign">🔏 CA 签名</button>
+          <button v-if="selected && !selected.signed" class="btn btn-primary" :disabled="busy" @click="onSign">🔏 CA 签名</button>
           <button v-else class="btn btn-primary" @click="router.push('/p360')">🔁 复诊续方</button>
         </div>
       </div>
+      <div v-else class="card right-card empty-card">← 从左侧选择患者查看病历</div>
     </div>
   </section>
   <PrintPreviewDialog v-model:visible="previewVisible" :title="previewTitle" :print-html="previewHtml" />
@@ -153,16 +176,23 @@ const route = useRoute()
 const { height: windowHeight } = useWindowSize()
 
 const records = ref<MedicalRecord[]>([])
-const selected = ref<MedicalRecord | null>(null)
 const keyword = ref('')
 const filter = ref<'all' | 'unsigned' | 'signed' | 'recent'>('all')
-const typeFilter = ref<'all' | 'outpatient' | 'prescription' | 'admission'>('all')
 const busy = ref(false)
-
 const page = ref(1)
 const total = ref(0)
 
-/** 动态每页条数：按视窗高度计算（列表行高约 58px，头部/分页约 200px） */
+const PATIENT_TABS = [
+  { value: 'outpatient', label: '门诊病历' },
+  { value: 'prescription', label: '💊 处方' },
+  { value: 'admission', label: '入院记录' }
+] as const
+
+const activePatientId = ref('')
+const activeTab = ref<'outpatient' | 'prescription' | 'admission'>('outpatient')
+const tabIndex = ref(0)
+
+/** 动态每页条数：按视窗高度计算 */
 const pageSize = computed(() => {
   const vh = windowHeight.value
   return Math.min(50, Math.max(5, Math.floor((vh - 210) / 58)))
@@ -170,7 +200,79 @@ const pageSize = computed(() => {
 
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
 
-/** 处方条目：按分号拆分 prescriptionSummary */
+interface PatientGroup {
+  patientId: string
+  patientName: string
+  latestAt?: string
+  latestDiagnosis: string
+  outpatientCount: number
+  prescriptionCount: number
+  admissionCount: number
+  unsignedCount: number
+  records: MedicalRecord[]
+}
+
+/** 患者聚合：同一患者的所有类型病历归到一组 */
+const patientGroups = computed<PatientGroup[]>(() => {
+  const map = new Map<string, PatientGroup>()
+  for (const r of records.value) {
+    let g = map.get(r.patientId)
+    if (!g) {
+      g = {
+        patientId: r.patientId,
+        patientName: r.patientName,
+        latestDiagnosis: '',
+        outpatientCount: 0,
+        prescriptionCount: 0,
+        admissionCount: 0,
+        unsignedCount: 0,
+        records: []
+      }
+      map.set(r.patientId, g)
+    }
+    g.records.push(r)
+    if (r.type === 'outpatient') g.outpatientCount++
+    else if (r.type === 'prescription') g.prescriptionCount++
+    else g.admissionCount++
+    if (!r.signed) g.unsignedCount++
+    if (!g.latestAt || new Date(r.visitedAt ?? 0) > new Date(g.latestAt)) {
+      g.latestAt = r.visitedAt
+      g.latestDiagnosis = r.diagnosis[0]?.name ?? '—'
+    }
+  }
+  return [...map.values()]
+})
+
+const activePatient = computed(() => patientGroups.value.find((g) => g.patientId === activePatientId.value) ?? null)
+
+const tabRecords = computed(() => {
+  if (!activePatient.value) return []
+  return activePatient.value.records
+    .filter((r) => r.type === activeTab.value)
+    .sort((a, b) => new Date(b.visitedAt ?? 0).getTime() - new Date(a.visitedAt ?? 0).getTime())
+})
+
+const selected = computed<MedicalRecord | null>(() => tabRecords.value[Math.min(tabIndex.value, tabRecords.value.length - 1)] ?? null)
+
+function tabCount(t: typeof activeTab.value): number {
+  return activePatient.value?.records.filter((r) => r.type === t).length ?? 0
+}
+
+function typeLabel(t: typeof activeTab.value): string {
+  return t === 'prescription' ? '处方' : t === 'admission' ? '入院记录' : '门诊病历'
+}
+
+/** 选中患者：自动定位到第一个有内容的 tab（门诊优先） */
+function selectPatient(patientId: string): void {
+  activePatientId.value = patientId
+  const g = activePatient.value
+  if (!g) return
+  if (g.outpatientCount > 0) activeTab.value = 'outpatient'
+  else if (g.prescriptionCount > 0) activeTab.value = 'prescription'
+  else activeTab.value = 'admission'
+  tabIndex.value = 0
+}
+
 const rxItems = computed(() => {
   if (!selected.value?.prescriptionSummary) return []
   return selected.value.prescriptionSummary
@@ -188,26 +290,22 @@ async function load(): Promise<void> {
     keyword: keyword.value.trim() || undefined,
     signed: filter.value === 'unsigned' ? 'false' : filter.value === 'signed' ? 'true' : undefined,
     recent: filter.value === 'recent' ? true : undefined,
-    type: typeFilter.value === 'all' ? undefined : typeFilter.value,
+    type: undefined,
     page: page.value,
     pageSize: pageSize.value
   })
   records.value = result.items
   total.value = result.total
-  // 保证选中项在当前页内
-  if (!selected.value || !records.value.some((r) => r._id === selected.value?._id)) {
-    selected.value = records.value[0] ?? null
+  // 保持当前选中患者；不在结果中则回退到第一位
+  if (!patientGroups.value.some((g) => g.patientId === activePatientId.value)) {
+    const first = patientGroups.value[0]
+    if (first) selectPatient(first.patientId)
+    else activePatientId.value = ''
   }
 }
 
 function changeFilter(f: typeof filter.value): void {
   filter.value = f
-  page.value = 1
-  void load()
-}
-
-function changeTypeFilter(f: typeof typeFilter.value): void {
-  typeFilter.value = f
   page.value = 1
   void load()
 }
@@ -223,7 +321,6 @@ async function goPage(p: number): Promise<void> {
   await load()
 }
 
-// 视窗尺寸变化：重算每页条数并从第一页重载
 watch(pageSize, () => {
   if (records.value.length > 0) {
     page.value = 1
@@ -258,14 +355,13 @@ async function onSign(): Promise<void> {
   if (!selected.value || selected.value.signed) return
   busy.value = true
   try {
-    selected.value = await signRecord(selected.value._id)
+    await signRecord(selected.value._id)
     await load()
   } finally {
     busy.value = false
   }
 }
 
-/** 🖨 打印选中病历：打开打印预览对话框（联查患者性别/年龄） */
 const previewVisible = ref(false)
 const previewHtml = ref('')
 const previewTitle = ref('')
@@ -276,8 +372,7 @@ async function onPrint(): Promise<void> {
   try {
     const patient = await fetchPatient(selected.value.patientId)
     previewHtml.value = buildRecordPrintHtml(selected.value, patient)
-    const kind = selected.value.type === 'prescription' ? '处方' : selected.value.type === 'admission' ? '入院记录' : '门诊病历'
-    previewTitle.value = `${kind} · ${selected.value.patientName}`
+    previewTitle.value = `${typeLabel(activeTab.value)} · ${selected.value.patientName}`
     previewVisible.value = true
   } catch (e) {
     alertError((e as Error).message)
@@ -287,7 +382,6 @@ async function onPrint(): Promise<void> {
 }
 
 onMounted(() => {
-  // 支持 ?filter=unsigned（顶栏 CA 签名入口）预筛选
   const f = route.query.filter
   if (f === 'unsigned' || f === 'signed' || f === 'recent') {
     filter.value = f
@@ -298,94 +392,59 @@ onMounted(() => {
 
 <style scoped>
 .emr-page {
-  height: 100%;
   display: flex;
   flex-direction: column;
+  height: calc(100vh - 78px);
 }
-/* 左右模块随视窗高度自适应 */
 .grid2 {
   display: grid;
-  grid-template-columns: 330px 1fr;
-  gap: 14px;
-  align-items: stretch;
-  height: calc(100vh - 190px);
-  min-height: 320px;
+  grid-template-columns: 300px 1fr;
+  gap: 12px;
+  min-height: 0;
+  flex: 1;
 }
 .left-card {
   display: flex;
   flex-direction: column;
-  padding: 12px;
-  overflow: hidden;
-  height: 100%;
+  min-height: 0;
+}
+.right-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 .emr-list {
   flex: 1;
-  min-height: 0;
   overflow-y: auto;
-}
-.right-card {
-  height: 100%;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-.prev-hd {
-  padding: 15px 20px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  flex-shrink: 0;
-}
-.prev-body {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  padding-bottom: 14px;
-}
-.prev-ft {
-  display: flex;
-  gap: 10px;
-  justify-content: flex-end;
-  padding: 13px 20px;
-  border-top: 1px solid var(--border);
-  flex-shrink: 0;
+  padding: 10px;
 }
 .emr-item {
   display: flex;
   align-items: center;
-  gap: 11px;
-  padding: 11px 13px;
+  gap: 10px;
+  padding: 10px;
   border-radius: 12px;
   cursor: pointer;
-  transition: 0.15s;
   border: 1px solid transparent;
+  transition: 0.15s;
 }
 .emr-item:hover {
   background: var(--card2);
 }
 .emr-item.sel {
-  background: var(--primary-soft);
+  background: var(--primary-bg);
   border-color: var(--primary);
 }
-.ed {
-  width: 38px;
-  height: 38px;
-  border-radius: 11px;
-  background: var(--card2);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--primary);
-  flex-shrink: 0;
+.emr-item .ed {
+  font-size: 12px;
+  font-weight: 600;
   text-align: center;
-  line-height: 1.2;
+  color: var(--text-2);
+  white-space: nowrap;
 }
-.emr-item.sel .ed {
-  background: var(--card);
+.emr-item .ed small {
+  font-weight: 400;
+  color: var(--green);
 }
 .empty {
   padding: 30px;
@@ -393,21 +452,126 @@ onMounted(() => {
   color: var(--text-mute);
   font-size: 12.5px;
 }
-.block {
-  margin: 14px 20px;
-  padding: 15px 17px;
+.empty-card {
+  align-items: center;
+  justify-content: center;
+  color: var(--text-mute);
+  font-size: 13px;
+}
+.prev-hd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.ptabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 16px 0;
+}
+.ptab {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-mute);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: 0.15s;
+}
+.ptab:hover {
+  color: var(--primary);
+}
+.ptab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+}
+.ptab-n {
+  margin-left: 4px;
+  font-size: 11px;
+  background: var(--card2);
+  padding: 1px 7px;
+  border-radius: 9px;
+}
+.visit-row-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px 0;
+}
+.visit-row {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+  /* 日期 chips 不换行：超出部分横向滚动，不挤压页面高度 */
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+.visit-row::-webkit-scrollbar {
+  height: 5px;
+}
+.visit-row::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+.visit-chip {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 14px;
   background: var(--card2);
   border: 1px solid var(--border);
-  border-radius: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
 }
-.block.hl {
+.visit-chip.active {
   border-color: var(--primary);
-  box-shadow: 0 0 0 3px var(--primary-soft);
+  color: var(--primary);
+  font-weight: 600;
+}
+.visit-count {
+  flex-shrink: 0;
+  font-size: 11.5px;
+  color: var(--text-mute);
+  white-space: nowrap;
+}
+.dot-done {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+.prev-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+.prev-ft {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+}
+.prev-ft .btn-primary:last-child {
+  margin-left: auto;
+}
+.block {
+  margin-bottom: 12px;
 }
 .bl {
-  font-size: 12px;
+  font-size: 11.5px;
+  font-weight: 600;
   color: var(--text-mute);
-  margin-bottom: 7px;
+  letter-spacing: 1px;
+  margin: 14px 0 8px;
 }
 .bb {
   font-size: 13.5px;
@@ -415,15 +579,20 @@ onMounted(() => {
   word-break: break-all;
   overflow-wrap: anywhere;
 }
+.block.hl {
+  background: var(--primary-bg);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
 /* 处方笺版式 */
 .rx-pad {
-  margin: 16px 20px;
+  margin: 4px auto 16px;
+  max-width: 560px;
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 24px 26px;
   box-shadow: var(--shadow);
-  font-family: var(--font);
 }
 .rx-title {
   text-align: center;
@@ -441,42 +610,35 @@ onMounted(() => {
   border-bottom: 1px dashed var(--border-strong);
 }
 .rx-dx {
-  margin: 12px 0;
+  margin-top: 10px;
   font-size: 13px;
   font-weight: 600;
 }
 .rx-rp {
-  border: 1px solid var(--border-strong);
+  margin-top: 10px;
+  border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 14px 16px;
-  min-height: 120px;
-  background: #fdfdf8;
+  padding: 12px 14px;
+  min-height: 96px;
 }
 .rx-rp-h {
-  font-size: 14px;
   font-weight: 700;
-  margin-bottom: 8px;
+  font-size: 14px;
+  margin-bottom: 6px;
 }
 .rx-item {
   font-size: 13px;
-  line-height: 2;
+  line-height: 1.9;
 }
 .rx-empty {
   color: var(--text-mute);
   font-size: 12px;
-  padding: 10px 0;
 }
 .rx-sign {
-  margin-top: 18px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 12.5px;
-}
-.sep {
-  width: 1px;
-  height: 18px;
-  background: var(--border-strong);
-  margin: 0 4px;
+  margin-top: 20px;
+  font-size: 13px;
 }
 </style>

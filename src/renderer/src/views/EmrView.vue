@@ -164,6 +164,7 @@ import { fetchRecordPage, signRecord } from '@/api/emr'
 import { fetchPatient } from '@/api/patients'
 import { buildRecordPrintHtml } from '@/utils/print'
 import { emitDataChanged } from '@/utils/events'
+import { useUserStore } from '@/stores/user'
 import PrintPreviewDialog from '@/components/PrintPreviewDialog.vue'
 import Pagination from '@/components/Pagination.vue'
 import { ElMessageBox } from 'element-plus'
@@ -177,6 +178,7 @@ function alertError(msg: string, title = '操作失败'): void {
 
 const router = useRouter()
 const route = useRoute()
+const userStore = useUserStore()
 const { height: windowHeight } = useWindowSize()
 
 const records = ref<MedicalRecord[]>([])
@@ -405,7 +407,7 @@ async function onPrint(): Promise<void> {
   busy.value = true
   try {
     const patient = await fetchPatient(selected.value.patientId)
-    previewHtml.value = buildRecordPrintHtml(selected.value, patient)
+    previewHtml.value = buildRecordPrintHtml(selected.value, patient, userStore.user?.department)
     previewTitle.value = `${typeLabel(activeTab.value)} · ${selected.value.patientName}`
     previewVisible.value = true
   } catch (e) {

@@ -54,7 +54,7 @@
         <div class="ava">{{ p.name[0] }}</div>
         <div style="flex: 1; min-width: 0">
           <b style="font-size: 13.5px">{{ p.name }}</b>
-          <span style="color: var(--text-mute); font-size: 11.5px">
+          <span style="color: var(--text-mute); font-size: 11.5px; margin-left: 8px">
             {{ p.gender ?? '未知' }} · {{ p.phone ?? '' }}
           </span>
           <div style="font-size: 11.5px; color: var(--text-mute); margin-top: 2px">

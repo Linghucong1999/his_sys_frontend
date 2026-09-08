@@ -182,6 +182,7 @@ import AiCopilotPanel from '@/components/AiCopilotPanel.vue'
 import type { DiagnosisItem, MedicalRecord, RxItem, Patient } from '@/api/types'
 import { buildRecordPrintHtml } from '@/utils/print'
 import { emitDataChanged } from '@/utils/events'
+import { useUserStore } from '@/stores/user'
 import PrintPreviewDialog from '@/components/PrintPreviewDialog.vue'
 import Pagination from '@/components/Pagination.vue'
 import AutoTextarea from '@/components/AutoTextarea.vue'
@@ -199,6 +200,7 @@ function alertError(msg: string, title = '操作失败'): void {
 
 const router = useRouter()
 const patientStore = usePatientStore()
+const userStore = useUserStore()
 
 const tab = ref<'record' | 'prescription' | 'exam'>('record')
 const savedTip = ref('')
@@ -529,7 +531,7 @@ function onPrint(): void {
       })),
       prescriptionSummary: rxSummary.value
     }
-    previewHtml.value = buildRecordPrintHtml(draft, patient.value)
+    previewHtml.value = buildRecordPrintHtml(draft, patient.value, userStore.user?.department)
     previewTitle.value = `处方笺 · ${patient.value.name}`
   } else if (tab.value === 'exam') {
     // 检查申请单

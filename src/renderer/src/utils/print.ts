@@ -56,13 +56,14 @@ function checkBox(label: string, checked: boolean): string {
 }
 
 /** 处方笺（医院版式：费别/处方编号/姓名/病历号/诊断/住址电话/签名栏/费用栏） */
-function rxHtml(record: MedicalRecord, patient?: Patient | null): string {
+function rxHtml(record: MedicalRecord, patient: Patient | null | undefined, doctorDept?: string): string {
   const fee = feeType(patient)
   const gender = patient?.gender ?? ''
   const age = patient ? ageOf(patient.birthDate) : ''
   const lines = rxLines(record)
   const dx = record.diagnosis.map((d) => (d.code ? `${d.code} ${d.name}` : d.name)).join('；')
   return `
+    <div class="rx-red-line">处方仅当天有效</div>
     <div class="rx-head">
       <div class="rx-row">
         <span>费别：${checkBox('公费', fee === '公费')}${checkBox('自费', fee === '自费')}${checkBox('医保', fee === '医保')}${checkBox('其他', fee === '其他')}</span>
@@ -75,7 +76,7 @@ function rxHtml(record: MedicalRecord, patient?: Patient | null): string {
       </div>
       <div class="rx-row">
         <span>门诊/住院病历号：${esc(patient?.medicalRecordNo ?? '')}</span>
-        <span>科别（病区/床位号）：${esc(record.department)}</span>
+        <span>科别（病区/床位号）：${esc(doctorDept || record.department)}</span>
       </div>
       <div class="rx-row">
         <span>临床诊断：${esc(dx || '—')}</span>
@@ -125,7 +126,7 @@ function recordSections(record: MedicalRecord, isExam: boolean): string[] {
  * - outpatient/admission：病历
  * - exam：检查申请单
  */
-export function buildRecordPrintHtml(record: MedicalRecord, patient?: Patient | null): string {
+export function buildRecordPrintHtml(record: MedicalRecord, patient?: Patient | null, doctorDepartment?: string): string {
   const type = record.type
   const isRx = type === 'prescription'
   const isExam = type === 'exam'
@@ -133,7 +134,7 @@ export function buildRecordPrintHtml(record: MedicalRecord, patient?: Patient | 
   const patientName = record.patientName || patient?.name || ''
 
   const body = isRx
-    ? rxHtml(record, patient)
+    ? rxHtml(record, patient, doctorDepartment)
     : `
     <div class="meta">
       <span>姓名：${esc(patientName)}</span>
@@ -172,6 +173,27 @@ export function buildRecordPrintHtml(record: MedicalRecord, patient?: Patient | 
   .no-print { display: none; }
 
   /* ===== 处方笺（医院模板） ===== */
+  .rx-red-line {
+    text-align: center;
+    font-family: '华文行楷', 'STXingkai', '楷体', 'KaiTi', serif;
+    font-size: 15pt;
+    font-weight: bold;
+    color: #c8102e;
+    letter-spacing: 10px;
+    text-indent: 10px;
+    padding: 2px 0 6px;
+    text-shadow: 1px 1px 0 rgba(200, 16, 46, 0.25);
+  }
+  .rx-red-line::before,
+  .rx-red-line::after {
+    content: '❀ ❀ ❀';
+    color: #c8102e;
+    font-size: 9pt;
+    letter-spacing: 4px;
+    margin: 0 14px;
+    vertical-align: 2px;
+    opacity: 0.85;
+  }
   .rx-head { border: 1px solid #000; border-bottom: none; padding: 8px 12px; }
   .rx-row { display: flex; flex-wrap: wrap; gap: 2px 28px; font-size: 11.5pt; margin: 3px 0; }
   .rx-row .pull { margin-left: auto; }

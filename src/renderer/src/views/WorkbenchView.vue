@@ -98,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { useTodoStore } from '@/stores/todo'
@@ -110,21 +110,33 @@ const router = useRouter()
 const userStore = useUserStore()
 const todoStore = useTodoStore()
 
+/** 当前时刻（每 30s 刷新，保证问候语与门诊时段随时段变化） */
+const now = ref(new Date())
+
 const greeting = computed(() => {
-  const h = new Date().getHours()
+  const h = now.value.getHours()
   if (h < 12) return '早上好'
   if (h < 18) return '下午好'
   return '晚上好'
 })
 
 const dateText = computed(() => {
-  const d = new Date()
+  const d = now.value
+  const h = d.getHours()
   const week = ['日', '一', '二', '三', '四', '五', '六'][d.getDay()]
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 星期${week} · 上午门诊`
+  const period = h < 12 ? '上午门诊' : h < 18 ? '下午门诊' : '晚间门诊'
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 星期${week} · ${period}`
 })
 
+let clockTimer: ReturnType<typeof setInterval> | undefined
 onMounted(() => {
   void todoStore.load()
+  clockTimer = setInterval(() => {
+    now.value = new Date()
+  }, 30000)
+})
+onUnmounted(() => {
+  if (clockTimer) clearInterval(clockTimer)
 })
 
 function go(view: string): void {

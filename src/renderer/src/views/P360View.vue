@@ -244,8 +244,10 @@ function queryDrugs(query: string, cb: (list: Array<{ value: string; spec?: stri
 }
 
 /** ICD-10 联想（el-autocomplete 数据源） */
+let dxBeforeSelect = '' // 选择建议项前的完整输入文本（el-autocomplete 会在 select 时先把 v-model 覆盖为选中项）
 function queryIcd(query: string, cb: (list: Array<{ value: string }>) => void): void {
-  const segs = form.value.diagnosisText.split(/[；;]/)
+  dxBeforeSelect = query
+  const segs = query.split(/[；;]/)
   const kw = (segs[segs.length - 1] ?? '').trim().toLowerCase()
   const list = icdOptions.value
     .filter((d) => !kw || d.name.toLowerCase().includes(kw) || d.code.toLowerCase().includes(kw))
@@ -254,16 +256,16 @@ function queryIcd(query: string, cb: (list: Array<{ value: string }>) => void): 
   cb(list)
 }
 
-/** 选择诊断：替换正在编辑片段并自动补齐「；」 */
+/** 选择诊断：基于选择前文本替换正在编辑片段并自动补齐「；」，多个诊断可累积 */
 function onIcdSelect(item: { value?: string }): void {
   const v = item.value ?? ''
-  const trimmed = form.value.diagnosisText.trim()
+  const trimmed = dxBeforeSelect.trim()
   const segs = trimmed
     .split(/[；;]/)
     .map((s) => s.trim())
     .filter(Boolean)
   const done =
-    trimmed === '' || trimmed.endsWith('；') || trimmed.endsWith(';') ? segs : segs.slice(0, -1)
+    trimmed === '' || /[；;]$/.test(trimmed) ? segs : segs.slice(0, -1)
   form.value.diagnosisText = [...done, v].join('；') + '；'
 }
 

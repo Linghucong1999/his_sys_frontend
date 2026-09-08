@@ -43,14 +43,44 @@
         <EmrBlock v-if="tab === 'record'" label="现病史" ai="✨ 语音转写">
           <AutoTextarea v-model="form.presentIllness" placeholder="现病史…" />
         </EmrBlock>
-        <div v-if="tab === 'record'" class="two-col">
-          <EmrBlock label="既往史">
-            <AutoTextarea v-model="form.pastHistory" placeholder="既往史…" />
+        <EmrBlock v-if="tab === 'record'" label="既往史">
+          <AutoTextarea v-model="form.pastHistory" placeholder="既往史…" />
+        </EmrBlock>
+        <EmrBlock v-if="tab === 'record'" label="体格检查">
+          <div class="vital-grid">
+              <div class="vital-item vital-bp-item">
+                <label>血压</label>
+                <div class="vital-bp">
+                  <input v-model="vitals.bpHigh" class="inp vital-inp" placeholder="收缩压" />
+                  <span class="vital-slash">/</span>
+                  <input v-model="vitals.bpLow" class="inp vital-inp" placeholder="舒张压" />
+                  <span class="vital-unit">mmHg</span>
+                </div>
+              </div>
+              <div class="vital-item">
+                <label>呼吸</label>
+                <div class="vital-one">
+                  <input v-model="vitals.breath" class="inp vital-inp" placeholder="—" />
+                  <span class="vital-unit">次/分</span>
+                </div>
+              </div>
+              <div class="vital-item">
+                <label>体温</label>
+                <div class="vital-one">
+                  <input v-model="vitals.temp" class="inp vital-inp" placeholder="—" />
+                  <span class="vital-unit">℃</span>
+                </div>
+              </div>
+              <div class="vital-item">
+                <label>脉搏</label>
+                <div class="vital-one">
+                  <input v-model="vitals.pulse" class="inp vital-inp" placeholder="—" />
+                  <span class="vital-unit">次/分</span>
+                </div>
+              </div>
+            </div>
+            <AutoTextarea v-model="form.physicalExam" placeholder="其他体征（可自主填写，如神志、心肺听诊、腹部触诊等）…" />
           </EmrBlock>
-          <EmrBlock label="体格检查">
-            <AutoTextarea v-model="form.physicalExam" placeholder="体格检查…" />
-          </EmrBlock>
-        </div>
         <EmrBlock v-if="tab === 'record'" label="初步诊断" ai="ICD-10 智能匹配" highlight>
           <ElAutocomplete
             v-model="form.diagnosisText"
@@ -169,7 +199,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePatientStore, TAB_OF_PENDING } from '@/stores/patient'
 import { listRecords, saveRecord, signRecord } from '@/api/emr'
@@ -208,6 +238,82 @@ const busy = ref(false)
 const errorMsg = ref('')
 
 const currentRecord = ref<MedicalRecord | null>(null)
+
+/** 生命体征结构化填写（单位固定，医生只填数字） */
+const vitals = reactive({
+  bpHigh: '',
+  bpLow: '',
+  breath: '',
+  temp: '',
+  pulse: ''
+})
+
+/** 生命体征 → 打印/存储用规范化文本行 */
+function vitalLine(): string {
+  const parts: string[] = []
+  if (vitals.bpHigh || vitals.bpLow) parts.push(`血压 ${vitals.bpHigh || '—'}/${vitals.bpLow || '—'}mmHg`)
+  if (vitals.breath) parts.push(`呼吸 ${vitals.breath}次/分`)
+  if (vitals.temp) parts.push(`体温 ${vitals.temp}℃`)
+  if (vitals.pulse) parts.push(`脉搏 ${vitals.pulse}次/分`)
+  return parts.join('；')
+}
+
+/** 仅含已填写的体征值（空值不上送） */
+function pureVitals(): { bpHigh?: string; bpLow?: string; breath?: string; temp?: string; pulse?: string } {
+  const v: Record<string, string> = {}
+  if (vitals.bpHigh) v.bpHigh = vitals.bpHigh
+  if (vitals.bpLow) v.bpLow = vitals.bpLow
+  if (vitals.breath) v.breath = vitals.breath
+  if (vitals.temp) v.temp = vitals.temp
+  if (vitals.pulse) v.pulse = vitals.pulse
+  return v
+}
+
+/** 从已存体格检查文本解析体征值，返回剩余自由文本 */
+function parseVitals(text: string): string {
+  const rest: string[] = []
+  const lines = (text ?? '').split(/\n+/)
+  for (const line of lines) {
+    const bp = line.match(/血压\s*(\d{2,3})\/(\d{2,3})\s*mmHg/)
+    const breath = line.match(/呼吸\s*(\d{1,2})\s*次\/分/)
+    const temp = line.match(/体温\s*(\d{2}(?:\.\d)?)\s*℃/)
+    const pulse = line.match(/脉搏\s*(\d{2,3})\s*次\/分/)
+    let consumed = false
+    if (bp) {
+      vitals.bpHigh = bp[1]
+      vitals.bpLow = bp[2]
+      consumed = true
+    }
+    if (breath) {
+      vitals.breath = breath[1]
+      consumed = true
+    }
+    if (temp) {
+      vitals.temp = temp[1]
+      consumed = true
+    }
+    if (pulse) {
+      vitals.pulse = pulse[1]
+      consumed = true
+    }
+    if (!consumed) rest.push(line)
+  }
+  return rest.join('\n').trim()
+}
+
+function resetVitals(): void {
+  vitals.bpHigh = ''
+  vitals.bpLow = ''
+  vitals.breath = ''
+  vitals.temp = ''
+  vitals.pulse = ''
+}
+
+/** 保存用体格检查文本（仅其他体征自由文本；生命体征走结构化 vitals 字段） */
+function mergedPhysicalExam(): string {
+  return form.value.physicalExam.trim()
+}
+
 const form = ref({
   chiefComplaint: '',
   presentIllness: '',
@@ -362,6 +468,7 @@ async function loadRecord(): Promise<void> {
       prescriptionSummary: '',
       examRequest: ''
     }
+    resetVitals()
     rxRows.value = [{ drug: '' }]
     baselineRx = ''
     return
@@ -370,10 +477,22 @@ async function loadRecord(): Promise<void> {
     chiefComplaint: latest.chiefComplaint ?? '',
     presentIllness: latest.presentIllness ?? '',
     pastHistory: latest.pastHistory ?? '',
-    physicalExam: latest.physicalExam ?? '',
+    physicalExam: '',
     diagnosisText: latest.diagnosis?.map((d) => `${d.code} ${d.name}`).join('；') ?? '',
     prescriptionSummary: latest.prescriptionSummary ?? '',
     examRequest: latest.examRequest ?? ''
+  }
+  // 体格检查：优先结构化 vitals 回填，旧数据从文本解析，其余进入"其他体征"自由文本
+  resetVitals()
+  if (latest.vitals) {
+    vitals.bpHigh = latest.vitals.bpHigh ?? ''
+    vitals.bpLow = latest.vitals.bpLow ?? ''
+    vitals.breath = latest.vitals.breath ?? ''
+    vitals.temp = latest.vitals.temp ?? ''
+    vitals.pulse = latest.vitals.pulse ?? ''
+    form.value.physicalExam = latest.physicalExam ?? ''
+  } else {
+    form.value.physicalExam = parseVitals(latest.physicalExam ?? '')
   }
   // 处方回填：优先结构化条目
   if (latest.prescriptionItems && latest.prescriptionItems.length > 0) {
@@ -442,7 +561,8 @@ async function onSave(): Promise<void> {
       chiefComplaint: form.value.chiefComplaint,
       presentIllness: form.value.presentIllness,
       pastHistory: form.value.pastHistory,
-      physicalExam: form.value.physicalExam,
+      physicalExam: mergedPhysicalExam(),
+      vitals: pureVitals(),
       diagnosis: parseDiagnosis(form.value.diagnosisText),
       prescriptionSummary: buildSummaryWithHistory(),
       prescriptionItems: validRxRows.value,
@@ -552,7 +672,8 @@ function onPrint(): void {
       chiefComplaint: form.value.chiefComplaint,
       presentIllness: form.value.presentIllness,
       pastHistory: form.value.pastHistory,
-      physicalExam: form.value.physicalExam,
+      physicalExam: mergedPhysicalExam(),
+      vitals: pureVitals(),
       prescriptionSummary: form.value.prescriptionSummary,
       examRequest: form.value.examRequest
     }
@@ -704,6 +825,67 @@ watch(
   color: var(--primary);
   font-weight: 600;
   box-shadow: var(--shadow);
+}
+
+/* ===== 生命体征结构化填写 ===== */
+.vital-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+.vital-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.vital-item label {
+  font-size: 12px;
+  color: var(--text-sub);
+  letter-spacing: 0.5px;
+}
+.vital-bp {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.vital-one {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.vital-inp {
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-size: 14px;
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+  transition: 0.15s;
+}
+.vital-inp:focus {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0, 82, 217, 0.12);
+}
+.vital-slash {
+  color: var(--text-mute);
+  font-size: 13px;
+}
+.vital-unit {
+  color: var(--text-mute);
+  font-size: 11.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .two-col {
   display: grid;

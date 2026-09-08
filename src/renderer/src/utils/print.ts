@@ -105,7 +105,18 @@ function recordSections(record: MedicalRecord, isExam: boolean): string[] {
     if (record.chiefComplaint) sections.push(`<div class="sec"><div class="sec-h">主诉</div><div class="sec-b">${esc(record.chiefComplaint)}</div></div>`)
     if (record.presentIllness) sections.push(`<div class="sec"><div class="sec-h">现病史</div><div class="sec-b">${esc(record.presentIllness)}</div></div>`)
     if (record.pastHistory) sections.push(`<div class="sec"><div class="sec-h">既往史</div><div class="sec-b">${esc(record.pastHistory)}</div></div>`)
-    if (record.physicalExam) sections.push(`<div class="sec"><div class="sec-h">体格检查</div><div class="sec-b">${esc(record.physicalExam)}</div></div>`)
+    if (record.physicalExam || record.vitals) {
+      const v = record.vitals
+      const vitalParts: string[] = []
+      if (v) {
+        if (v.bpHigh || v.bpLow) vitalParts.push(`血压 ${v.bpHigh || '—'}/${v.bpLow || '—'}mmHg`)
+        if (v.breath) vitalParts.push(`呼吸 ${v.breath}次/分`)
+        if (v.temp) vitalParts.push(`体温 ${v.temp}℃`)
+        if (v.pulse) vitalParts.push(`脉搏 ${v.pulse}次/分`)
+      }
+      const peText = [vitalParts.join('；'), record.physicalExam].filter(Boolean).join('\n')
+      if (peText) sections.push(`<div class="sec"><div class="sec-h">体格检查</div><div class="sec-b">${esc(peText)}</div></div>`)
+    }
   }
   if (record.diagnosis.length > 0) {
     const dx = record.diagnosis.map((d) => (d.code ? `${d.code} ${d.name}` : d.name)).join('；')

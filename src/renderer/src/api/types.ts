@@ -58,6 +58,13 @@ export interface MedicalRecord {
   visitedAt?: string
   createdAt?: string
   doctorUsername?: string
+  vitals?: {
+    bpHigh?: string
+    bpLow?: string
+    breath?: string
+    temp?: string
+    pulse?: string
+  }
 }
 
 export interface Visit {

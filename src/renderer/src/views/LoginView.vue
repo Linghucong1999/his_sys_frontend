@@ -25,6 +25,10 @@
           placeholder="密码"
           @keydown.enter="doLogin"
         />
+        <label class="remember-row">
+          <input v-model="rememberMe" type="checkbox" class="remember-check" />
+          <span>记住密码</span>
+        </label>
         <div class="lb">登录角色（RBAC）</div>
         <div class="role-row">
           <div
@@ -50,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 
@@ -59,8 +63,23 @@ const userStore = useUserStore()
 
 const username = ref('')
 const password = ref('')
+const rememberMe = ref(false)
 const loading = ref(false)
 const errorMsg = ref('')
+
+onMounted(async () => {
+  // 启动时若存在已保存凭据，自动填充并勾选"记住密码"
+  try {
+    const saved = await window.api.loadCredentials()
+    if (saved?.username) {
+      username.value = saved.username
+      password.value = saved.password
+      rememberMe.value = true
+    }
+  } catch {
+    // 读取失败时静默忽略，用户手动输入即可
+  }
+})
 
 const roles = [
   { key: 'doctor', icon: '🩺', label: '医生' },
@@ -86,6 +105,12 @@ async function doLogin(): Promise<void> {
   errorMsg.value = ''
   try {
     await userStore.login(username.value.trim(), password.value)
+    // 勾选记住密码则加密保存，未勾选则清除历史凭据
+    if (rememberMe.value) {
+      await window.api.saveCredentials(username.value.trim(), password.value).catch(() => undefined)
+    } else {
+      await window.api.clearCredentials().catch(() => undefined)
+    }
     router.push('/workbench')
   } catch (e) {
     errorMsg.value = (e as Error).message
@@ -218,6 +243,24 @@ async function doLogin(): Promise<void> {
   color: var(--text-sub);
   margin: 13px 0 6px;
   font-weight: 500;
+}
+.remember-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
+  font-size: 12.5px;
+  color: var(--text-sub);
+  cursor: pointer;
+  user-select: none;
+  width: fit-content;
+}
+.remember-check {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--primary);
 }
 .role-row {
   display: grid;

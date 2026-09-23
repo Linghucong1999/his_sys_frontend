@@ -92,26 +92,98 @@
         </EmrBlock>
         <EmrBlock v-if="tab === 'prescription'" label="处方表单" ai="药品联想输入">
           <div class="rx-form">
-            <div v-for="(row, i) in rxRows" :key="i" class="rx-row">
-              <ElAutocomplete
-                v-model="row.drug"
-                class="rx-drug"
-                placeholder="药品名（输入联想）"
-                :fetch-suggestions="queryDrugs"
-                @select="(item) => onDrugSelect(item, row)"
-              />
-              <ElInput v-model="row.spec" class="rx-spec" placeholder="规格" />
-              <ElInput v-model="row.dose" class="rx-dose" placeholder="剂量" />
-              <ElSelect v-model="row.frequency" class="rx-freq" placeholder="频次" clearable>
-                <ElOption v-for="f in FREQ_OPTIONS" :key="f.value" :label="f.label" :value="f.value" />
-              </ElSelect>
-              <ElSelect v-model="row.route" class="rx-route" placeholder="途径" clearable>
-                <ElOption v-for="r in ROUTE_OPTIONS" :key="r" :label="r" :value="r" />
-              </ElSelect>
-              <ElInput v-model="row.duration" class="rx-dur" placeholder="疗程(如7天)" />
-              <button class="btn btn-ghost btn-sm rx-del" @click="removeRxRow(i)">✕</button>
+            <!-- 处方类型切换：西药 / 中药饮片 -->
+            <div class="rx-mode-row">
+              <div
+                class="rx-mode-chip"
+                :class="{ sel: rxMode === 'western' }"
+                @click="switchRxMode('western')"
+              >
+                💊 西药处方
+              </div>
+              <div
+                class="rx-mode-chip"
+                :class="{ sel: rxMode === 'herbal' }"
+                @click="switchRxMode('herbal')"
+              >
+                🌿 中药处方
+              </div>
+              <div v-if="rxMode === 'herbal'" class="rx-mode-stat">
+                共 {{ herbCount }} 味 · 总剂量 {{ herbTotalDose }} 克
+              </div>
             </div>
-            <button class="btn btn-ghost btn-sm" @click="addRxRow">＋ 添加药品</button>
+
+            <!-- 西药处方：结构化条目 -->
+            <template v-if="rxMode === 'western'">
+              <div v-for="(row, i) in rxRows" :key="i" class="rx-row">
+                <ElAutocomplete
+                  v-model="row.drug"
+                  class="rx-drug"
+                  placeholder="药品名（输入联想）"
+                  :fetch-suggestions="queryDrugs"
+                  @select="(item) => onDrugSelect(item, row)"
+                />
+                <ElInput v-model="row.spec" class="rx-spec" placeholder="规格" />
+                <ElInput v-model="row.dose" class="rx-dose" placeholder="剂量" />
+                <ElSelect v-model="row.frequency" class="rx-freq" placeholder="频次" clearable>
+                  <ElOption v-for="f in FREQ_OPTIONS" :key="f.value" :label="f.label" :value="f.value" />
+                </ElSelect>
+                <ElSelect v-model="row.route" class="rx-route" placeholder="途径" clearable>
+                  <ElOption v-for="r in ROUTE_OPTIONS" :key="r" :label="r" :value="r" />
+                </ElSelect>
+                <ElInput v-model="row.duration" class="rx-dur" placeholder="疗程(如7天)" />
+                <button class="btn btn-ghost btn-sm rx-del" @click="removeRxRow(i)">✕</button>
+              </div>
+              <button class="btn btn-ghost btn-sm" @click="addRxRow">＋ 添加药品</button>
+            </template>
+
+            <!-- 中药处方：饮片明细 + 统一用法 -->
+            <template v-else>
+              <div class="herb-list-hd">
+                <span>饮片明细</span>
+                <span class="herb-list-tip">逐味填写药名与克数，支持自由输入</span>
+              </div>
+              <div v-for="(row, i) in herbRows" :key="i" class="herb-row">
+                <span class="herb-idx">{{ i + 1 }}</span>
+                <ElAutocomplete
+                  v-model="row.drug"
+                  class="herb-drug"
+                  placeholder="饮片名（输入联想）"
+                  :fetch-suggestions="queryHerbs"
+                />
+                <div class="herb-dose-wrap">
+                  <ElInput v-model="row.dose" class="herb-dose" placeholder="剂量" />
+                  <span class="herb-unit">克</span>
+                </div>
+                <button class="btn btn-ghost btn-sm rx-del" title="删除该饮片" @click="removeHerbRow(i)">✕</button>
+              </div>
+              <button class="btn btn-ghost btn-sm" @click="addHerbRow">＋ 添加饮片</button>
+
+              <div class="herb-usage">
+                <div class="herb-usage-item">
+                  <span class="herb-usage-label">煎服法</span>
+                  <ElSelect v-model="herbalUsage.decoction" placeholder="煎服法" clearable>
+                    <ElOption v-for="d in HERB_DECOCTION_OPTIONS" :key="d" :label="d" :value="d" />
+                  </ElSelect>
+                </div>
+                <div class="herb-usage-item herb-usage-wide">
+                  <span class="herb-usage-label">服法</span>
+                  <ElSelect v-model="herbalUsage.usage" placeholder="服法" clearable>
+                    <ElOption v-for="u in HERB_USAGE_OPTIONS" :key="u" :label="u" :value="u" />
+                  </ElSelect>
+                </div>
+                <div class="herb-usage-item">
+                  <span class="herb-usage-label">剂数</span>
+                  <div class="herb-dose-wrap">
+                    <ElInput v-model="herbalUsage.doses" placeholder="7" />
+                    <span class="herb-unit">剂</span>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="herbSummary" class="herb-preview">{{ herbSummary }}</div>
+            </template>
+
             <div v-if="form.prescriptionSummary" class="legacy-rx">
               <div class="legacy-rx-title">📜 历次处方摘要（续写累积，含时间戳）</div>
               <div class="legacy-rx-body">{{ form.prescriptionSummary }}</div>
@@ -214,7 +286,7 @@ import PatientJourney from '@/components/PatientJourney.vue'
 import type { JourneyNode } from '@/components/PatientJourney.vue'
 import EmrBlock from '@/components/EmrBlock.vue'
 import AiCopilotPanel from '@/components/AiCopilotPanel.vue'
-import type { DiagnosisItem, MedicalRecord, RxItem, Patient } from '@/api/types'
+import type { DiagnosisItem, MedicalRecord, RxItem, Patient, HerbalUsage } from '@/api/types'
 import { buildRecordPrintHtml, type PrintBuildOptions } from '@/utils/print'
 import { emitDataChanged } from '@/utils/events'
 import { useUserStore } from '@/stores/user'
@@ -346,6 +418,40 @@ const FREQ_OPTIONS = [
 ]
 const ROUTE_OPTIONS = ['口服', '静脉滴注', '静脉注射', '肌肉注射', '雾化吸入', '外用', '舌下含服']
 
+/** ===== 中药处方（饮片）===== */
+/** 处方模式：western=西药/中成药，herbal=中药饮片 */
+const rxMode = ref<'western' | 'herbal'>('western')
+/** 中药饮片行（药名 + 剂量克数） */
+const herbRows = ref<Array<{ drug: string; dose: string }>>([{ drug: '', dose: '' }])
+/** 中药用法（煎服法 / 服法 / 剂数） */
+const herbalUsage = ref<HerbalUsage>({
+  decoction: '水煎服',
+  usage: '每日1剂，分2次温服',
+  doses: '7'
+})
+
+/** 煎服法可选值 */
+const HERB_DECOCTION_OPTIONS = ['水煎服', '开水冲服', '打粉冲服', '泡服', '外用熏洗']
+/** 服法可选值 */
+const HERB_USAGE_OPTIONS = [
+  '每日1剂，分2次温服',
+  '每日1剂，分3次温服',
+  '每日1剂，分早晚2次温服',
+  '隔日1剂，分2次温服',
+  '每日2剂，分次温服'
+]
+/** 常用中药饮片（联想输入，可自由录入其他饮片） */
+const COMMON_HERBS = [
+  '党参', '黄芪', '白术', '茯苓', '甘草', '当归', '川芎', '白芍', '熟地黄', '生地黄',
+  '柴胡', '黄芩', '黄连', '黄柏', '栀子', '半夏', '法半夏', '陈皮', '桔梗', '枳壳',
+  '桂枝', '麻黄', '杏仁', '石膏', '知母', '金银花', '连翘', '薄荷', '荆芥', '防风',
+  '羌活', '独活', '葛根', '升麻', '泽泻', '猪苓', '车前子', '滑石', '茵陈', '苍术',
+  '厚朴', '砂仁', '藿香', '佩兰', '麦冬', '天冬', '沙参', '玉竹', '枸杞子', '山茱萸',
+  '山药', '牡丹皮', '赤芍', '丹参', '桃仁', '红花', '牛膝', '杜仲', '续断', '五味子',
+  '酸枣仁', '远志', '龙骨', '牡蛎', '生姜', '大枣', '内金', '女贞子', '款冬花', '香附',
+  '郁金', '延胡索', '干姜', '附子', '肉桂', '龙胆草', '木通', '酸枣', '桑白皮', '紫菀'
+]
+
 function queryDrugs(query: string, cb: (list: Array<{ value: string; spec?: string }>) => void): void {
   const kw = (query ?? '').trim().toLowerCase()
   const list = kw
@@ -412,6 +518,54 @@ function rxSummaryOf(rows: RxItem[]): string {
 
 const rxSummary = computed(() => rxSummaryOf(rxRows.value))
 
+/** ===== 中药处方（饮片）===== */
+/** 有效饮片行（药名非空） */
+const validHerbRows = computed(() => herbRows.value.filter((r) => r.drug.trim()))
+/** 饮片味数 */
+const herbCount = computed(() => validHerbRows.value.length)
+/** 饮片总剂量（克） */
+const herbTotalDose = computed(() =>
+  validHerbRows.value.reduce((sum, r) => sum + (Number(r.dose) || 0), 0)
+)
+/** 中药摘要：党参15克、黄芪15克…；水煎服，每日1剂，分2次温服，共7剂 */
+const herbSummary = computed(() => {
+  const items = validHerbRows.value.map((r) => `${r.drug.trim()}${r.dose ? `${r.dose}克` : ''}`).join('、')
+  if (!items) return ''
+  const u = herbalUsage.value
+  const tail = [u.decoction, u.usage, u.doses ? `共${u.doses}剂` : ''].filter(Boolean).join('，')
+  return `【中药饮片】${items}。${tail}`
+})
+/** 当前模式的处方条目（保存/打印用） */
+const activeRxItems = computed<RxItem[]>(() =>
+  rxMode.value === 'herbal'
+    ? validHerbRows.value.map((r) => ({ drug: r.drug.trim(), dose: r.dose ? `${r.dose}克` : '' }))
+    : validRxRows.value
+)
+/** 当前模式的处方摘要 */
+const activeRxSummary = computed(() => (rxMode.value === 'herbal' ? herbSummary.value : rxSummary.value))
+
+/** 饮片联想（常用饮片 + 本单已录入饮片，可自由输入其他） */
+function queryHerbs(query: string, cb: (list: Array<{ value: string }>) => void): void {
+  const kw = (query ?? '').trim().toLowerCase()
+  const entered = herbRows.value.map((r) => r.drug.trim()).filter(Boolean)
+  const pool = Array.from(new Set([...COMMON_HERBS, ...entered]))
+  const list = (kw ? pool.filter((h) => h.toLowerCase().includes(kw)) : pool).slice(0, 10)
+  cb(list.map((h) => ({ value: h })))
+}
+
+function addHerbRow(): void {
+  herbRows.value.push({ drug: '', dose: '' })
+}
+
+function removeHerbRow(i: number): void {
+  if (herbRows.value.length > 1) herbRows.value.splice(i, 1)
+}
+
+/** 切换处方模式（西药 / 中药，各自已录入内容保留） */
+function switchRxMode(mode: 'western' | 'herbal'): void {
+  rxMode.value = mode
+}
+
 /** 复诊调档回填的原始处方文本：与回填内容相同时不重复写入处方摘要 */
 let baselineRx = ''
 
@@ -474,7 +628,9 @@ async function loadRecord(): Promise<void> {
       examRequest: ''
     }
     resetVitals()
+    rxMode.value = 'western'
     rxRows.value = [{ drug: '' }]
+    herbRows.value = [{ drug: '', dose: '' }]
     baselineRx = ''
     return
   }
@@ -499,15 +655,27 @@ async function loadRecord(): Promise<void> {
   } else {
     form.value.physicalExam = parseVitals(latest.physicalExam ?? '')
   }
-  // 处方回填：优先结构化条目
-  if (latest.prescriptionItems && latest.prescriptionItems.length > 0) {
+  // 处方回填：按处方类型恢复（中药饮片 / 西药条目）
+  rxMode.value = latest.prescriptionType === 'herbal' ? 'herbal' : 'western'
+  if (rxMode.value === 'herbal') {
+    const items = latest.prescriptionItems ?? []
+    herbRows.value =
+      items.length > 0
+        ? items.map((r) => ({ drug: r.drug, dose: (r.dose ?? '').replace(/克$/, '') }))
+        : [{ drug: '', dose: '' }]
+    herbalUsage.value = {
+      decoction: latest.herbalUsage?.decoction ?? '水煎服',
+      usage: latest.herbalUsage?.usage ?? '每日1剂，分2次温服',
+      doses: latest.herbalUsage?.doses ?? '7'
+    }
+    rxRows.value = [{ drug: '' }]
+  } else if (latest.prescriptionItems && latest.prescriptionItems.length > 0) {
     rxRows.value = latest.prescriptionItems.map((r) => ({ ...r }))
-    // 记录回填基线：医生未改动时不把旧处方重复追加进摘要
-    baselineRx = rxSummaryOf(rxRows.value)
   } else {
     rxRows.value = [{ drug: '' }]
-    baselineRx = ''
   }
+  // 回填基线：医生未改动时不把旧处方重复追加进摘要
+  baselineRx = activeRxSummary.value
 }
 
 function parseDiagnosis(text: string): DiagnosisItem[] {
@@ -531,7 +699,7 @@ function stampNow(): string {
 }
 
 function buildSummaryWithHistory(): string {
-  const cur = rxSummary.value.trim()
+  const cur = activeRxSummary.value.trim()
   const base = (form.value.prescriptionSummary ?? '').trim()
   if (!cur) return base
   // 复诊调档回填后未改动：不把旧处方重复追加进摘要
@@ -570,7 +738,9 @@ async function onSave(): Promise<void> {
       vitals: pureVitals(),
       diagnosis: parseDiagnosis(form.value.diagnosisText),
       prescriptionSummary: buildSummaryWithHistory(),
-      prescriptionItems: validRxRows.value,
+      prescriptionItems: activeRxItems.value,
+      prescriptionType: rxMode.value,
+      herbalUsage: rxMode.value === 'herbal' ? herbalUsage.value : undefined,
       examRequest: form.value.examRequest
     }
     if (currentRecord.value && !currentRecord.value.signed) {
@@ -597,7 +767,7 @@ async function onSign(): Promise<void> {
   // CA 签名前置条件：门诊病历 / 处方 / 检查申请 三者缺一不可（不满足弹窗提示）
   const missing: string[] = []
   if (!form.value.chiefComplaint.trim()) missing.push('门诊病历（主诉未填写）')
-  if (!(rxSummary.value || form.value.prescriptionSummary.trim())) missing.push('处方')
+  if (!(activeRxSummary.value || form.value.prescriptionSummary.trim())) missing.push('处方')
   if (!form.value.examRequest.trim()) missing.push('检查申请')
   if (missing.length > 0) {
     await ElMessageBox.alert(
@@ -645,21 +815,16 @@ function buildPreviewHtml(options: PrintBuildOptions): string {
     signedAt: currentRecord.value?.signedAt
   }
   if (tab.value === 'prescription') {
-    // 处方笺：结构化条目优先，回退摘要文本
+    // 处方笺：西药结构化条目 / 中药饮片 + 统一用法
     const draft: MedicalRecord = {
       ...base,
       type: 'prescription',
-      prescriptionItems: validRxRows.value.map((r) => ({
-        drug: r.drug,
-        spec: r.spec,
-        dose: r.dose,
-        frequency: r.frequency,
-        route: r.route,
-        duration: r.duration
-      })),
-      prescriptionSummary: rxSummary.value
+      prescriptionType: rxMode.value,
+      prescriptionItems: activeRxItems.value,
+      herbalUsage: rxMode.value === 'herbal' ? herbalUsage.value : undefined,
+      prescriptionSummary: activeRxSummary.value
     }
-    previewTitle.value = `处方笺 · ${patient.value.name}`
+    previewTitle.value = `${rxMode.value === 'herbal' ? '中药处方笺' : '处方笺'} · ${patient.value.name}`
     return buildRecordPrintHtml(draft, patient.value, userStore.user?.department, options)
   }
   if (tab.value === 'exam') {
@@ -949,6 +1114,99 @@ watch(
 .rx-del {
   color: var(--red);
   padding: 0;
+}
+/* 处方类型切换（西药 / 中药） */
+.rx-mode-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.rx-mode-chip {
+  padding: 6px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  font-size: 12.5px;
+  color: var(--text-sub);
+  cursor: pointer;
+  transition: 0.15s;
+  user-select: none;
+}
+.rx-mode-chip.sel {
+  background: var(--primary-soft);
+  color: var(--primary);
+  border-color: var(--primary);
+  font-weight: 600;
+}
+.rx-mode-stat {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-mute);
+}
+/* 中药饮片明细 */
+.herb-list-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-sub);
+  font-weight: 600;
+  margin-top: 2px;
+}
+.herb-list-tip {
+  font-size: 11px;
+  color: var(--text-mute);
+  font-weight: 400;
+}
+.herb-row {
+  display: grid;
+  grid-template-columns: 26px 1.6fr 1fr 36px;
+  gap: 6px;
+  align-items: center;
+}
+.herb-idx {
+  font-size: 12px;
+  color: var(--text-mute);
+  text-align: center;
+}
+.herb-dose-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.herb-unit {
+  font-size: 12.5px;
+  color: var(--text-sub);
+  flex-shrink: 0;
+}
+.herb-usage {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr 0.8fr;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px;
+  background: var(--card2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.herb-usage-item {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.herb-usage-label {
+  font-size: 11.5px;
+  color: var(--text-mute);
+}
+.herb-preview {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--text-sub);
+  background: var(--primary-soft);
+  border-radius: 8px;
+  padding: 8px 10px;
+  line-height: 1.6;
 }
 .legacy-rx {
   margin-top: 6px;

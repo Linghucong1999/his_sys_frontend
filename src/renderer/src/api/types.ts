@@ -53,6 +53,10 @@ export interface MedicalRecord {
   examRequest?: string
   signed: boolean
   prescriptionItems?: RxItem[]
+  /** 处方类型：western=西药/中成药；herbal=中药饮片 */
+  prescriptionType?: 'western' | 'herbal'
+  /** 中药处方用法（煎服法/服法/剂数） */
+  herbalUsage?: HerbalUsage
   signedAt?: string
   signedBy?: string
   visitedAt?: string
@@ -156,6 +160,13 @@ export interface RxItem {
   frequency?: string
   route?: string
   duration?: string
+}
+
+/** 中药处方用法（煎服法 / 服法 / 剂数） */
+export interface HerbalUsage {
+  decoction?: string
+  usage?: string
+  doses?: string
 }
 
 /** 药品说明书库条目 */

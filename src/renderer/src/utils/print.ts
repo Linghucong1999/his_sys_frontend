@@ -55,9 +55,28 @@ function checkBox(label: string, checked: boolean): string {
   return `<span class="cb">${checked ? '☑' : '□'}${label}</span>`
 }
 
+/** 中药处方正文：饮片按 4 列排列 + 统一用法（煎服法/服法/剂数） */
+function herbalBody(record: MedicalRecord): string {
+  const items = (record.prescriptionItems ?? []).filter((it) => it.drug?.trim())
+  if (items.length === 0) return '<div class="rx-line rx-empty">（无饮片明细）</div>'
+  const herbs = items
+    .map((it) => `<span class="herb-item">${esc(it.drug)}<b>${esc(it.dose ?? '')}</b></span>`)
+    .join('')
+  const usage = record.herbalUsage ?? {}
+  const usageLine = [usage.decoction, usage.usage].filter(Boolean).join('，')
+  return `
+      <div class="rx-herb-grid">${herbs}</div>
+      <div class="rx-herb-usage">
+        <span>共 ${items.length} 味</span>
+        ${usageLine ? `<span>${esc(usageLine)}</span>` : ''}
+        ${usage.doses ? `<span>共 ${esc(usage.doses)} 剂</span>` : ''}
+      </div>`
+}
+
 /** 处方笺（医院版式：费别/处方编号/姓名/病历号/诊断/住址电话/签名栏/费用栏） */
 function rxHtml(record: MedicalRecord, patient: Patient | null | undefined, doctorDept?: string): string {
   const fee = feeType(patient)
+  const isHerbal = record.prescriptionType === 'herbal'
   const gender = patient?.gender ?? ''
   const age = patient ? ageOf(patient.birthDate) : ''
   const lines = rxLines(record)
@@ -87,7 +106,13 @@ function rxHtml(record: MedicalRecord, patient: Patient | null | undefined, doct
       </div>
     </div>
     <div class="rx-body">
-      ${lines.length > 0 ? lines.map((l) => `<div class="rx-line">${esc(l)}</div>`).join('\n      ') : '<div class="rx-line rx-empty">（无处方明细）</div>'}
+      ${
+        isHerbal
+          ? herbalBody(record)
+          : lines.length > 0
+            ? lines.map((l) => `<div class="rx-line">${esc(l)}</div>`).join('\n      ')
+            : '<div class="rx-line rx-empty">（无处方明细）</div>'
+      }
     </div>
     <div class="rx-sign-rows">
       <div class="rx-row">医师：${esc(record.doctorName)}<span class="sig">医师手签：</span><span class="sig">审核药师：</span></div>
@@ -233,7 +258,15 @@ export function buildRecordPrintHtml(
   const type = record.type
   const isRx = type === 'prescription'
   const isExam = type === 'exam'
-  const title = isRx ? '处方笺' : isExam ? '检查申请单' : type === 'admission' ? '入院记录' : '门诊病历'
+  const title = isRx
+    ? record.prescriptionType === 'herbal'
+      ? '中药处方笺'
+      : '处方笺'
+    : isExam
+      ? '检查申请单'
+      : type === 'admission'
+        ? '入院记录'
+        : '门诊病历'
   const patientName = record.patientName || patient?.name || ''
 
   const body = isRx
@@ -295,6 +328,24 @@ export function buildRecordPrintHtml(
   .rx-body { border: 1px solid #000; border-bottom: none; min-height: 140px; padding: 10px 12px; }
   .rx-line { font-size: 11.5pt; margin: 4px 0; }
   .rx-empty { color: #888; }
+  /* 中药饮片：按 4 列排列，药名 + 剂量 */
+  .rx-herb-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 5px 14px;
+    font-size: 11.5pt;
+  }
+  .rx-herb-grid .herb-item { white-space: nowrap; }
+  .rx-herb-usage {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 26px;
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px dashed #999;
+    font-size: 11.5pt;
+    font-weight: bold;
+  }
   .rx-sign-rows { border: 1px solid #000; border-bottom: none; padding: 8px 12px; font-size: 11.5pt; }
   .rx-fee { display: flex; justify-content: space-between; border: 1px solid #000; padding: 8px 12px; font-size: 11.5pt; }
 </style>

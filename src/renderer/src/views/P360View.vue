@@ -195,7 +195,12 @@
       <Pagination :page="patientPage" :total="patientTotal" :page-size="PAGE_SIZE" @change="goPage" />
     </div>
   </section>
-  <PrintPreviewDialog v-model:visible="previewVisible" :title="previewTitle" :print-html="previewHtml" />
+  <PrintPreviewDialog
+    v-model:visible="previewVisible"
+    :title="previewTitle"
+    :print-html="previewHtml"
+    :build-html="buildPreviewHtml"
+  />
 </template>
 
 <script setup lang="ts">
@@ -210,7 +215,7 @@ import type { JourneyNode } from '@/components/PatientJourney.vue'
 import EmrBlock from '@/components/EmrBlock.vue'
 import AiCopilotPanel from '@/components/AiCopilotPanel.vue'
 import type { DiagnosisItem, MedicalRecord, RxItem, Patient } from '@/api/types'
-import { buildRecordPrintHtml } from '@/utils/print'
+import { buildRecordPrintHtml, type PrintBuildOptions } from '@/utils/print'
 import { emitDataChanged } from '@/utils/events'
 import { useUserStore } from '@/stores/user'
 import PrintPreviewDialog from '@/components/PrintPreviewDialog.vue'
@@ -622,8 +627,9 @@ const previewVisible = ref(false)
 const previewHtml = ref('')
 const previewTitle = ref('')
 
-function onPrint(): void {
-  if (!patient.value) return
+/** 按纸张/方向/缩放构建当前单据打印稿（预览对话框切换设置时实时更新） */
+function buildPreviewHtml(options: PrintBuildOptions): string {
+  if (!patient.value) return previewHtml.value
   const diagnosis = parseDiagnosis(form.value.diagnosisText)
   const base: MedicalRecord = {
     _id: currentRecord.value?._id ?? 'draft',
@@ -653,33 +659,37 @@ function onPrint(): void {
       })),
       prescriptionSummary: rxSummary.value
     }
-    previewHtml.value = buildRecordPrintHtml(draft, patient.value, userStore.user?.department)
     previewTitle.value = `处方笺 · ${patient.value.name}`
-  } else if (tab.value === 'exam') {
+    return buildRecordPrintHtml(draft, patient.value, userStore.user?.department, options)
+  }
+  if (tab.value === 'exam') {
     // 检查申请单
     const draft: MedicalRecord = {
       ...base,
       type: 'exam',
       examRequest: form.value.examRequest
     }
-    previewHtml.value = buildRecordPrintHtml(draft, patient.value)
     previewTitle.value = `检查申请单 · ${patient.value.name}`
-  } else {
-    // 门诊病历
-    const draft: MedicalRecord = {
-      ...base,
-      type: 'outpatient',
-      chiefComplaint: form.value.chiefComplaint,
-      presentIllness: form.value.presentIllness,
-      pastHistory: form.value.pastHistory,
-      physicalExam: mergedPhysicalExam(),
-      vitals: pureVitals(),
-      prescriptionSummary: form.value.prescriptionSummary,
-      examRequest: form.value.examRequest
-    }
-    previewHtml.value = buildRecordPrintHtml(draft, patient.value)
-    previewTitle.value = `门诊病历 · ${patient.value.name}`
+    return buildRecordPrintHtml(draft, patient.value, undefined, options)
   }
+  // 门诊病历
+  const draft: MedicalRecord = {
+    ...base,
+    type: 'outpatient',
+    chiefComplaint: form.value.chiefComplaint,
+    presentIllness: form.value.presentIllness,
+    pastHistory: form.value.pastHistory,
+    physicalExam: mergedPhysicalExam(),
+    vitals: pureVitals(),
+    prescriptionSummary: form.value.prescriptionSummary,
+    examRequest: form.value.examRequest
+  }
+  previewTitle.value = `门诊病历 · ${patient.value.name}`
+  return buildRecordPrintHtml(draft, patient.value, undefined, options)
+}
+
+function onPrint(): void {
+  previewHtml.value = buildPreviewHtml({ pageSize: 'A4' })
   previewVisible.value = true
 }
 

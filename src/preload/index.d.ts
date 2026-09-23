@@ -10,8 +10,16 @@ interface PrinterInfo {
 interface PrintOptions {
   silent?: boolean
   copies?: number
+  collate?: boolean
   deviceName?: string
-  pageSize?: string
+  pageSize?: 'A4' | 'A5' | 'B5' | 'Letter' | 'Legal'
+  landscape?: boolean
+  /** false=灰度打印 */
+  color?: boolean
+  pageRanges?: Array<{ from: number; to: number }>
+  duplexMode?: 'simplex' | 'shortEdge' | 'longEdge'
+  scaleFactor?: number
+  pagesPerSheet?: number
 }
 
 declare global {

@@ -153,7 +153,12 @@
       <div v-else class="card right-card empty-card">← 从左侧选择患者查看病历</div>
     </div>
   </section>
-  <PrintPreviewDialog v-model:visible="previewVisible" :title="previewTitle" :print-html="previewHtml" />
+  <PrintPreviewDialog
+    v-model:visible="previewVisible"
+    :title="previewTitle"
+    :print-html="previewHtml"
+    :build-html="buildPreviewHtml"
+  />
 </template>
 
 <script setup lang="ts">
@@ -162,14 +167,14 @@ import { useRouter, useRoute } from 'vue-router'
 import { useWindowSize } from '@vueuse/core'
 import { fetchRecordPage, signRecord } from '@/api/emr'
 import { fetchPatient } from '@/api/patients'
-import { buildRecordPrintHtml } from '@/utils/print'
+import { buildRecordPrintHtml, type PrintBuildOptions } from '@/utils/print'
 import { emitDataChanged } from '@/utils/events'
 import { useUserStore } from '@/stores/user'
 import PrintPreviewDialog from '@/components/PrintPreviewDialog.vue'
 import Pagination from '@/components/Pagination.vue'
 import { ElMessageBox } from 'element-plus'
 import 'element-plus/es/components/message-box/style/css'
-import type { MedicalRecord } from '@/api/types'
+import type { MedicalRecord, Patient } from '@/api/types'
 
 /** 统一错误弹窗 */
 function alertError(msg: string, title = '操作失败'): void {
@@ -401,13 +406,24 @@ async function onSign(): Promise<void> {
 const previewVisible = ref(false)
 const previewHtml = ref('')
 const previewTitle = ref('')
+/** 预览用患者信息缓存（切换纸张重建打印稿时需要） */
+const previewPatient = ref<Patient | null>(null)
+
+/** 按纸张/方向/缩放重建打印稿（预览对话框切换设置时实时更新） */
+function buildPreviewHtml(options: PrintBuildOptions): string {
+  if (!selected.value) return previewHtml.value
+  return buildRecordPrintHtml(selected.value, previewPatient.value, userStore.user?.department, options)
+}
 
 async function onPrint(): Promise<void> {
   if (!selected.value) return
   busy.value = true
   try {
     const patient = await fetchPatient(selected.value.patientId)
-    previewHtml.value = buildRecordPrintHtml(selected.value, patient, userStore.user?.department)
+    previewPatient.value = patient
+    previewHtml.value = buildRecordPrintHtml(selected.value, patient, userStore.user?.department, {
+      pageSize: 'A4'
+    })
     previewTitle.value = `${typeLabel(activeTab.value)} · ${selected.value.patientName}`
     previewVisible.value = true
   } catch (e) {

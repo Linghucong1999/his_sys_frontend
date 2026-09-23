@@ -145,6 +145,25 @@ function getPrintWindow(): BrowserWindow {
   return printWindow
 }
 
+/** 打印请求（渲染进程 → 主进程）：与 Electron WebContentsPrintOptions 对齐 */
+interface PrintHtmlPayload {
+  html: string
+  /** true=静默打印到指定/默认打印机；false=调起系统打印对话框 */
+  silent?: boolean
+  copies?: number
+  /** 多份时逐份输出 */
+  collate?: boolean
+  deviceName?: string
+  pageSize?: 'A4' | 'A5' | 'B5' | 'Letter' | 'Legal'
+  landscape?: boolean
+  /** false=灰度打印 */
+  color?: boolean
+  pageRanges?: Array<{ from: number; to: number }>
+  duplexMode?: 'simplex' | 'shortEdge' | 'longEdge'
+  scaleFactor?: number
+  pagesPerSheet?: number
+}
+
 function registerPrintHandler(): void {
   // 系统打印机列表（渲染进程预览对话框下拉选择用）
   ipcMain.handle('print:list-printers', async () => {
@@ -158,10 +177,7 @@ function registerPrintHandler(): void {
 
   ipcMain.handle(
     'print:html',
-    async (
-      _event,
-      payload: { html: string; silent?: boolean; copies?: number; deviceName?: string; pageSize?: string }
-    ) => {
+    async (_event, payload: PrintHtmlPayload) => {
       if (!payload || typeof payload.html !== 'string' || payload.html.length === 0) {
         throw new Error('打印内容无效')
       }
@@ -169,6 +185,7 @@ function registerPrintHandler(): void {
       // 非静默打印（系统打印对话框）时需显示窗口，否则 Windows 下对话框不可见
       if (!payload.silent) win.show()
       // 打印稿写入临时文件后加载（data: URL 会被 CSP 拦截，临时文件不受影响）
+      // 打印稿内已按所选纸张/方向生成 @page 与整体缩放，此处只需传入一致的物理纸张
       const fs = await import('fs')
       const os = await import('os')
       const tmpFile = join(os.tmpdir(), `his-print-${Date.now()}-${Math.random().toString(36).slice(2)}.html`)
@@ -181,7 +198,14 @@ function registerPrintHandler(): void {
               silent: payload.silent ?? false,
               printBackground: true,
               copies: Math.max(1, payload.copies ?? 1),
+              collate: payload.collate ?? true,
               deviceName: payload.deviceName || undefined,
+              landscape: payload.landscape ?? false,
+              color: payload.color ?? true,
+              pageRanges: payload.pageRanges?.length ? payload.pageRanges : undefined,
+              duplexMode: payload.duplexMode,
+              scaleFactor: payload.scaleFactor,
+              pagesPerSheet: payload.pagesPerSheet,
               pageSize:
                 payload.pageSize === 'B5'
                   ? B5_SIZE

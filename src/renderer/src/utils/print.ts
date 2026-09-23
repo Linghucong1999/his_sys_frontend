@@ -132,12 +132,104 @@ function recordSections(record: MedicalRecord, isExam: boolean): string[] {
 }
 
 /**
+ * 打印纸张：@page 尺寸与整页缩放（内容按 A4 版式设计，小纸张整体等比缩放以适配整张纸）
+ * zoom 基准：A4 可打印宽度 210-2×18=174mm；A5 148-2×10=128mm → 128/174≈0.736；
+ * B5 176-2×12=152mm → 152/174≈0.874
+ */
+export type PrintPageSize = 'A4' | 'A5' | 'B5' | 'Letter' | 'Legal'
+/** 方向：auto 按文档版式（默认纵向）、portrait 纵向、landscape 横向 */
+export type PrintOrientation = 'auto' | 'portrait' | 'landscape'
+/** 缩放：page=适配整张纸（默认，随纸张自动缩放）、actual=实际大小 1:1、数字=自定义百分比 */
+export type PrintFit = 'page' | 'actual' | number
+
+export interface PrintBuildOptions {
+  pageSize?: PrintPageSize
+  orientation?: PrintOrientation
+  fit?: PrintFit
+}
+
+/** 纸张物理尺寸（mm，纵向） */
+export const PRINT_PAPER_MM: Record<PrintPageSize, { w: number; h: number }> = {
+  A4: { w: 210, h: 297 },
+  A5: { w: 148, h: 210 },
+  B5: { w: 176, h: 250 },
+  Letter: { w: 216, h: 279 },
+  Legal: { w: 216, h: 356 }
+}
+
+/** CSS 预定义纸张名 */
+const CSS_PAGE_NAME: Record<PrintPageSize, string> = {
+  A4: 'A4',
+  A5: 'A5',
+  B5: 'B5',
+  Letter: 'letter',
+  Legal: 'legal'
+}
+
+/** 各纸张页边距（mm，纵向基准） */
+const PAGE_MARGIN: Record<PrintPageSize, { v: number; h: number }> = {
+  A4: { v: 20, h: 18 },
+  A5: { v: 10, h: 10 },
+  B5: { v: 12, h: 12 },
+  Letter: { v: 20, h: 16 },
+  Legal: { v: 20, h: 16 }
+}
+
+/** 纸张页边距（mm，v=上下 h=左右），预览估算可打印区域用 */
+export function pageMarginOf(pageSize: PrintPageSize): { v: number; h: number } {
+  return PAGE_MARGIN[pageSize] ?? PAGE_MARGIN.A4
+}
+
+/** CSS 毫米 → 像素（96dpi） */
+export const PRINT_MM_TO_PX = 96 / 25.4
+
+const MM_TO_PX = PRINT_MM_TO_PX
+
+/** A4 版式基准可打印宽度（210-2×18=174mm），内容整体缩放以此为 1 */
+const BASE_PRINTABLE_W = 174
+
+/** 纸张 CSS 像素尺寸（96dpi，按方向换算，预览排版用） */
+export function paperPxOf(pageSize: PrintPageSize, landscape = false): { w: number; h: number } {
+  const mm = PRINT_PAPER_MM[pageSize] ?? PRINT_PAPER_MM.A4
+  const rawW = (landscape ? mm.h : mm.w) * MM_TO_PX
+  const rawH = (landscape ? mm.w : mm.h) * MM_TO_PX
+  return { w: Math.round(rawW), h: Math.round(rawH) }
+}
+
+/** 适配整张纸的缩放：纸张可打印宽 / A4 基准可打印宽（A5≈0.736、B5≈0.874） */
+export function fitZoomOf(pageSize: PrintPageSize, landscape = false): number {
+  const mm = PRINT_PAPER_MM[pageSize] ?? PRINT_PAPER_MM.A4
+  const m = PAGE_MARGIN[pageSize] ?? PAGE_MARGIN.A4
+  const printableW = (landscape ? mm.h : mm.w) - m.h * 2
+  return Math.round((printableW / BASE_PRINTABLE_W) * 1000) / 1000
+}
+
+/** 由缩放模式解析出实际 zoom 值 */
+function resolveZoom(pageSize: PrintPageSize, landscape: boolean, fit: PrintFit): number {
+  if (fit === 'actual') return 1
+  if (typeof fit === 'number' && fit > 0) return Math.round((fit / 100) * 1000) / 1000
+  return fitZoomOf(pageSize, landscape)
+}
+
+/**
  * 打印文档生成：按业务分流版式
  * - prescription：处方笺（医院模板：费别/处方编号/姓名/病历号/临床诊断/开具日期/住址电话/Rp/签名栏/费用栏）
  * - outpatient/admission：病历
  * - exam：检查申请单
+ * options 决定 @page 纸张/方向与整页缩放，保证内容适配整张纸（预览与打印共用同一份文档）
  */
-export function buildRecordPrintHtml(record: MedicalRecord, patient?: Patient | null, doctorDepartment?: string): string {
+export function buildRecordPrintHtml(
+  record: MedicalRecord,
+  patient?: Patient | null,
+  doctorDepartment?: string,
+  options: PrintBuildOptions | PrintPageSize = {}
+): string {
+  const opts: PrintBuildOptions = typeof options === 'string' ? { pageSize: options } : options
+  const pageSize: PrintPageSize = opts.pageSize ?? 'A4'
+  const landscape = (opts.orientation ?? 'auto') === 'landscape'
+  const margin = PAGE_MARGIN[pageSize] ?? PAGE_MARGIN.A4
+  const pageCss = `${CSS_PAGE_NAME[pageSize] ?? 'A4'}${landscape ? ' landscape' : ''}`
+  const zoom = resolveZoom(pageSize, landscape, opts.fit ?? 'page')
   const type = record.type
   const isRx = type === 'prescription'
   const isExam = type === 'exam'
@@ -166,13 +258,12 @@ export function buildRecordPrintHtml(record: MedicalRecord, patient?: Patient | 
 <head>
 <meta charset="UTF-8" />
 <style>
-  @page { size: A4; margin: 20mm 18mm; }
+  @page { size: ${pageCss}; margin: ${margin.v}mm ${margin.h}mm; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: 'SimSun', '宋体', serif; font-size: 12pt; color: #000; line-height: 1.8; }
-  .doc { max-width: 160mm; margin: 0 auto; }
+  .doc { max-width: 160mm; margin: 0 auto; zoom: ${zoom}; }
   .head { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 6px; }
-  .head h1 { font-size: 18pt; letter-spacing: 2px; }
-  .head .sub { font-size: 9pt; color: #444; margin-top: 2px; }
+  .head h1 { font-size: 16pt; letter-spacing: 4px; }
   .meta { display: flex; flex-wrap: wrap; gap: 4px 24px; font-size: 11pt; margin: 10px 0 6px; padding: 6px 0; border-bottom: 1px dashed #999; }
   .sec { margin: 10px 0; }
   .sec-h { font-weight: bold; font-size: 11pt; }

@@ -11,8 +11,16 @@ export interface PrinterInfo {
 export interface PrintOptions {
   silent?: boolean
   copies?: number
+  collate?: boolean
   deviceName?: string
-  pageSize?: string
+  pageSize?: 'A4' | 'A5' | 'B5' | 'Letter' | 'Legal'
+  landscape?: boolean
+  /** false=灰度打印 */
+  color?: boolean
+  pageRanges?: Array<{ from: number; to: number }>
+  duplexMode?: 'simplex' | 'shortEdge' | 'longEdge'
+  scaleFactor?: number
+  pagesPerSheet?: number
 }
 
 // 通过 contextBridge 暴露给渲染进程的 API。
@@ -27,8 +35,15 @@ const api = {
       html,
       silent: options?.silent ?? false,
       copies: options?.copies ?? 1,
+      collate: options?.collate ?? true,
       deviceName: options?.deviceName,
-      pageSize: options?.pageSize
+      pageSize: options?.pageSize,
+      landscape: options?.landscape ?? false,
+      color: options?.color ?? true,
+      pageRanges: options?.pageRanges,
+      duplexMode: options?.duplexMode,
+      scaleFactor: options?.scaleFactor,
+      pagesPerSheet: options?.pagesPerSheet
     }),
   /** 记住密码：加密保存账号密码到用户数据目录 */
   saveCredentials: (username: string, password: string): Promise<{ ok: boolean; reason?: string | null }> =>

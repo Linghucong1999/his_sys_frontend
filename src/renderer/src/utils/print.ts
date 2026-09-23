@@ -157,7 +157,7 @@ export function buildRecordPrintHtml(record: MedicalRecord, patient?: Patient | 
     </div>
     ${recordSections(record, isExam).join('\n    ')}
     <div class="sign">
-      <div>医师签名：${esc(record.signedBy ?? '')}</div>
+      <div>医师签名：${esc(record.signedBy ?? record.doctorName)}</div>
       <div>日期：${record.signedAt ? fmtDateTime(record.signedAt).slice(0, 10) : ''}</div>
     </div>`
 

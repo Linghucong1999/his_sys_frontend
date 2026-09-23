@@ -211,11 +211,10 @@ export function buildRecordPrintHtml(record: MedicalRecord, patient?: Patient | 
 <body>
   <div class="doc">
     <div class="head">
-      <h1>HIS 医疗信息管理系统</h1>
-      <div class="sub">${title}</div>
+      <h1>${title}</h1>
     </div>
     ${body}
-    <div class="foot">本单据由 HIS 医疗信息管理系统生成 · 打印时间 ${fmtDateTime(new Date().toISOString())}</div>
+    <div class="foot">打印时间 ${fmtDateTime(new Date().toISOString())}</div>
   </div>
 </body>
 </html>`

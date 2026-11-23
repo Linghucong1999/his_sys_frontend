@@ -6,34 +6,45 @@
       <div class="qs-desc">首次就诊患者，医师直接创建档案与首诊病历</div>
       <div class="qs-form">
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
-          <input v-model="firstForm.name" class="inp" placeholder="患者姓名" />
-          <input v-model="firstForm.phone" class="inp" placeholder="手机号" />
+          <FloatField label="患者姓名" :value="firstForm.name">
+            <input v-model="firstForm.name" class="inp" />
+          </FloatField>
+          <FloatField label="手机号" :value="firstForm.phone">
+            <input v-model="firstForm.phone" class="inp" />
+          </FloatField>
         </div>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px">
-          <ElSelect v-model="firstForm.gender" class="his-ep-select" placeholder="性别" clearable>
-            <ElOption v-for="o in GENDER_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
-          </ElSelect>
-          <input v-model="firstForm.age" class="inp" placeholder="年龄" />
+          <FloatField label="性别" :value="firstForm.gender">
+            <ElSelect v-model="firstForm.gender" class="his-ep-select" placeholder="" clearable>
+              <ElOption v-for="o in GENDER_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
+            </ElSelect>
+          </FloatField>
+          <FloatField label="年龄" :value="firstForm.age">
+            <input v-model="firstForm.age" class="inp" />
+          </FloatField>
         </div>
-        <ElSelect
-          v-model="firstForm.insuranceType"
-          class="his-ep-select"
-          placeholder="医保类型"
-          clearable
-        >
-          <ElOption v-for="o in INSURANCE_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
-        </ElSelect>
-        <ElCascader
-          v-model="addressPath"
-          class="his-ep-select"
-          :options="regions"
-          :props="{ expandTrigger: 'hover' }"
-          placeholder="省 / 市 / 区（可输入搜索）"
-          filterable
-          clearable
-        />
-        <input v-model="detailAddress" class="inp" placeholder="详细地址（街道/门牌号）" />
-        <textarea v-model="firstForm.chiefComplaint" class="inp" placeholder="主诉（一句话）"></textarea>
+        <FloatField label="医保类型" :value="firstForm.insuranceType">
+          <ElSelect v-model="firstForm.insuranceType" class="his-ep-select" placeholder="" clearable>
+            <ElOption v-for="o in INSURANCE_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
+          </ElSelect>
+        </FloatField>
+        <FloatField label="省 / 市 / 区" :value="addressPath">
+          <ElCascader
+            v-model="addressPath"
+            class="his-ep-select"
+            :options="regions"
+            :props="{ expandTrigger: 'hover' }"
+            placeholder=""
+            filterable
+            clearable
+          />
+        </FloatField>
+        <FloatField label="详细地址" :value="detailAddress">
+          <input v-model="detailAddress" class="inp" />
+        </FloatField>
+        <FloatField label="主诉" :value="firstForm.chiefComplaint">
+          <textarea v-model="firstForm.chiefComplaint" class="inp"></textarea>
+        </FloatField>
         <button class="btn btn-primary" :disabled="loading" @click="onFirstVisit">创建档案并接诊 →</button>
       </div>
     </div>
@@ -42,12 +53,9 @@
       <div class="qs-title">🔁 复诊调档</div>
       <div class="qs-desc">已就诊过的患者，姓名 + 手机号调档，直接续方</div>
       <div class="search-row">
-        <input
-          v-model="searchKw"
-          class="inp search-inp"
-          placeholder="🔍 姓名 + 手机号，如：张丽华 138****2671"
-          @keydown.enter="onSearch"
-        />
+        <FloatField label="姓名 + 手机号" :value="searchKw" class="search-ff">
+          <input v-model="searchKw" class="inp search-inp" @keydown.enter="onSearch" />
+        </FloatField>
         <button class="btn btn-ghost search-btn" :disabled="searchLoading" @click="onSearch">搜索</button>
       </div>
       <div v-for="p in patientStore.searchResults.slice(0, 2)" :key="p._id" class="qs-result">
@@ -86,6 +94,7 @@ import { reactive, ref, watch, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePatientStore, TAB_OF_PENDING } from '@/stores/patient'
 import { ElMessageBox, ElSelect, ElOption, ElCascader } from 'element-plus'
+import FloatField from '@/components/FloatField.vue'
 import 'element-plus/es/components/message-box/style/css'
 import 'element-plus/es/components/select/style/css'
 import 'element-plus/es/components/option/style/css'
@@ -271,6 +280,10 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 8px;
   margin-bottom: 10px;
+}
+.search-ff {
+  flex: 1;
+  min-width: 0;
 }
 .search-inp {
   flex: 1;

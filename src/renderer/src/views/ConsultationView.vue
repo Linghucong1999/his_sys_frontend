@@ -49,12 +49,13 @@
         <div style="font-size: 11.5px; color: var(--text-mute); margin-bottom: 13px">提交即 CA 签名，写入审计日志</div>
         <div class="qs-form">
           <div class="search-row">
-            <input
-              v-model="form.patientKw"
-              class="inp search-inp"
-              placeholder="🔍 患者：姓名 + 手机号调档"
-              @keydown.enter="onPatientSearch"
-            />
+            <FloatField label="患者调档（姓名 + 手机号）" :value="form.patientKw" class="search-ff">
+              <input
+                v-model="form.patientKw"
+                class="inp"
+                @keydown.enter="onPatientSearch"
+              />
+            </FloatField>
             <button class="btn btn-ghost btn-sm search-btn" @click="onPatientSearch">搜索</button>
           </div>
           <div v-for="p in patientHits" :key="p._id" class="qs-result" @click="selectedPatient = p; patientHits = []">
@@ -62,18 +63,20 @@
             <span style="font-size: 11.5px; color: var(--text-mute)">{{ p.gender }} · {{ p.phone }}</span>
           </div>
           <div v-if="selectedPatient" class="sel-patient">已选：{{ selectedPatient.name }}</div>
-          <ElSelect v-model="form.toDept" class="his-ep-select" placeholder="会诊科室" clearable>
-            <ElOption v-for="d in depts" :key="d.name" :label="d.name" :value="d.name" />
-          </ElSelect>
-          <ElSelect v-model="form.type" class="his-ep-select" placeholder="会诊类型" clearable>
-            <ElOption value="normal" label="普通会诊（24h 内响应）" />
-            <ElOption value="urgent" label="⚡ 急会诊（10 分钟内响应）" />
-          </ElSelect>
-          <ElSelect v-model="form.type" class="his-ep-select" placeholder="会诊类型" clearable>
-            <ElOption value="normal" label="普通会诊（24h 内响应）" />
-            <ElOption value="urgent" label="⚡ 急会诊（10 分钟内响应）" />
-          </ElSelect>
-          <textarea v-model="form.summary" class="inp" placeholder="会诊事由与病情摘要…" style="min-height: 76px"></textarea>
+          <FloatField label="会诊科室" :value="form.toDept">
+            <ElSelect v-model="form.toDept" class="his-ep-select" placeholder="" clearable>
+              <ElOption v-for="d in depts" :key="d.name" :label="d.name" :value="d.name" />
+            </ElSelect>
+          </FloatField>
+          <FloatField label="会诊类型" :value="form.type">
+            <ElSelect v-model="form.type" class="his-ep-select" placeholder="" clearable>
+              <ElOption value="normal" label="普通会诊（24h 内响应）" />
+              <ElOption value="urgent" label="⚡ 急会诊（10 分钟内响应）" />
+            </ElSelect>
+          </FloatField>
+          <FloatField label="会诊事由与病情摘要" :value="form.summary">
+            <textarea v-model="form.summary" class="inp" style="min-height: 76px"></textarea>
+          </FloatField>
           <div v-if="errorMsg" style="font-size: 12px; color: var(--red)">{{ errorMsg }}</div>
           <button class="btn btn-primary" :disabled="busy" @click="onSubmit">🔏 签名并提交申请</button>
         </div>
@@ -89,6 +92,7 @@ import { searchPatients } from '@/api/patients'
 import { listDictionaries } from '@/api/misc'
 import { useUserStore } from '@/stores/user'
 import { ElSelect, ElOption } from 'element-plus'
+import FloatField from '@/components/FloatField.vue'
 import 'element-plus/es/components/select/style/css'
 import 'element-plus/es/components/option/style/css'
 import type { Consultation, Patient } from '@/api/types'
@@ -273,6 +277,10 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.search-ff {
+  flex: 1;
+  min-width: 0;
 }
 .search-inp {
   flex: 1;

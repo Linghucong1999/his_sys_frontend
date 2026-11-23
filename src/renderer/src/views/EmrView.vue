@@ -2,13 +2,9 @@
   <section class="emr-page">
     <div class="sec-hd">
       <div class="page-title">📋 电子病历</div>
-      <input
-        v-model="keyword"
-        class="inp"
-        placeholder="🔍 姓名 + 手机号 / 档案号"
-        style="width: 260px"
-        @keydown.enter="onSearch"
-      />
+      <FloatField label="姓名 + 手机号 / 档案号" :value="keyword" class="emr-search-ff">
+        <input v-model="keyword" class="inp" @keydown.enter="onSearch" />
+      </FloatField>
       <button class="btn btn-ghost btn-sm" @click="onSearch">搜索</button>
       <div class="chip" :class="{ active: filter === 'all' }" @click="changeFilter('all')">全部</div>
       <div class="chip" :class="{ active: filter === 'unsigned' }" @click="changeFilter('unsigned')">待签名</div>
@@ -173,6 +169,7 @@ import { useUserStore } from '@/stores/user'
 import PrintPreviewDialog from '@/components/PrintPreviewDialog.vue'
 import Pagination from '@/components/Pagination.vue'
 import { ElMessageBox } from 'element-plus'
+import FloatField from '@/components/FloatField.vue'
 import 'element-plus/es/components/message-box/style/css'
 import type { MedicalRecord, Patient } from '@/api/types'
 
@@ -443,6 +440,12 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.emr-search-ff {
+  width: 260px;
+}
+.sec-hd .ff {
+  --ff-bg: var(--bg);
+}
 .emr-page {
   display: flex;
   flex-direction: column;

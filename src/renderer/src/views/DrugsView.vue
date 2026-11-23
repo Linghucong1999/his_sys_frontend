@@ -2,20 +2,18 @@
   <section class="drugs-page">
     <div class="sec-hd">
       <div class="page-title">💊 药品说明书</div>
-      <input
-        v-model="keyword"
-        class="inp"
-        placeholder="🔍 输入药品名称，如：头孢 / 阿莫西林"
-        style="width: 280px"
-        @keydown.enter="load"
-      />
+      <FloatField label="药品名称" :value="keyword" class="drug-search-ff">
+        <input v-model="keyword" class="inp" @keydown.enter="load" />
+      </FloatField>
       <button class="btn btn-ghost btn-sm" @click="load">搜索</button>
       <span class="sep"></span>
       <div class="cat-select">
-        <ElSelect v-model="categoryFilter" class="his-ep-select" placeholder="药理分类" clearable @change="changeCategory">
-          <ElOption value="" label="全部药理分类" />
-          <ElOption v-for="c in categories" :key="c" :label="c" :value="c" />
-        </ElSelect>
+        <FloatField label="药理分类" :value="categoryFilter">
+          <ElSelect v-model="categoryFilter" class="his-ep-select" placeholder="" clearable @change="changeCategory">
+            <ElOption value="" label="全部药理分类" />
+            <ElOption v-for="c in categories" :key="c" :label="c" :value="c" />
+          </ElSelect>
+        </FloatField>
       </div>
       <span class="sep"></span>
       <div
@@ -90,6 +88,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { fetchDrugManuals, fetchDrugCategories, fetchUnknownDrugs, registerDrug } from '@/api/misc'
 import { ElSelect, ElOption, ElDialog, ElMessageBox } from 'element-plus'
+import FloatField from '@/components/FloatField.vue'
 import 'element-plus/es/components/select/style/css'
 import 'element-plus/es/components/option/style/css'
 import 'element-plus/es/components/dialog/style/css'
@@ -308,6 +307,12 @@ onMounted(() => {
   justify-content: center;
   color: var(--text-mute);
   font-size: 13px;
+}
+.drug-search-ff {
+  width: 280px;
+}
+.sec-hd .ff {
+  --ff-bg: var(--bg);
 }
 .cat-select {
   width: 200px;

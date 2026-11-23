@@ -64,7 +64,7 @@
           <div class="ops-sec">
             <div class="ops-label">纸张 / 份数</div>
             <div class="ops-row">
-              <ElSelect v-model="pageSize" class="his-ep-select ops-grow" placeholder="纸张">
+              <ElSelect v-model="pageSize" class="his-ep-select ops-grow" placeholder="">
                 <ElOption v-for="p in PAPER_OPTIONS" :key="p.value" :label="p.label" :value="p.value" />
               </ElSelect>
               <div class="copies-row">
@@ -92,7 +92,7 @@
                 v-model="customRange"
                 class="range-input"
                 :disabled="rangeMode !== 'custom'"
-                placeholder="如 1-2"
+                placeholder=""
               />
             </label>
             <div v-if="rangeMode === 'custom'" class="ops-note" :class="{ err: !parsedRanges }">

@@ -38,54 +38,57 @@
         </div>
 
         <EmrBlock v-if="tab === 'record'" label="主诉" ai="✨ AI 生成">
-          <AutoTextarea v-model="form.chiefComplaint" placeholder="主诉…" />
+          <AutoTextarea v-model="form.chiefComplaint" />
         </EmrBlock>
         <EmrBlock v-if="tab === 'record'" label="现病史" ai="✨ 语音转写">
-          <AutoTextarea v-model="form.presentIllness" placeholder="现病史…" />
+          <AutoTextarea v-model="form.presentIllness" />
         </EmrBlock>
         <EmrBlock v-if="tab === 'record'" label="既往史">
-          <AutoTextarea v-model="form.pastHistory" placeholder="既往史…" />
+          <AutoTextarea v-model="form.pastHistory" />
         </EmrBlock>
         <EmrBlock v-if="tab === 'record'" label="体格检查">
           <div class="vital-grid">
               <div class="vital-item vital-bp-item">
                 <label>血压</label>
                 <div class="vital-bp">
-                  <input v-model="vitals.bpHigh" class="inp vital-inp" placeholder="收缩压" />
+                  <FloatField label="收缩压" :value="vitals.bpHigh">
+                    <input v-model="vitals.bpHigh" class="inp vital-inp" />
+                  </FloatField>
                   <span class="vital-slash">/</span>
-                  <input v-model="vitals.bpLow" class="inp vital-inp" placeholder="舒张压" />
+                  <FloatField label="舒张压" :value="vitals.bpLow">
+                    <input v-model="vitals.bpLow" class="inp vital-inp" />
+                  </FloatField>
                   <span class="vital-unit">mmHg</span>
                 </div>
               </div>
               <div class="vital-item">
                 <label>呼吸</label>
                 <div class="vital-one">
-                  <input v-model="vitals.breath" class="inp vital-inp" placeholder="—" />
+                  <input v-model="vitals.breath" class="inp vital-inp" />
                   <span class="vital-unit">次/分</span>
                 </div>
               </div>
               <div class="vital-item">
                 <label>体温</label>
                 <div class="vital-one">
-                  <input v-model="vitals.temp" class="inp vital-inp" placeholder="—" />
+                  <input v-model="vitals.temp" class="inp vital-inp" />
                   <span class="vital-unit">℃</span>
                 </div>
               </div>
               <div class="vital-item">
                 <label>脉搏</label>
                 <div class="vital-one">
-                  <input v-model="vitals.pulse" class="inp vital-inp" placeholder="—" />
+                  <input v-model="vitals.pulse" class="inp vital-inp" />
                   <span class="vital-unit">次/分</span>
                 </div>
               </div>
             </div>
-            <AutoTextarea v-model="form.physicalExam" placeholder="其他体征（可自主填写，如神志、心肺听诊、腹部触诊等）…" />
+            <AutoTextarea v-model="form.physicalExam" />
           </EmrBlock>
         <EmrBlock v-if="tab === 'record'" label="初步诊断" ai="ICD-10 智能匹配" highlight>
           <ElAutocomplete
             v-model="form.diagnosisText"
             class="his-ep-select"
-            placeholder="输入诊断，或从下拉选择 ICD-10（多个诊断以「；」分隔）"
             :fetch-suggestions="queryIcd"
             @select="onIcdSelect"
           />
@@ -116,22 +119,33 @@
             <!-- 西药处方：结构化条目 -->
             <template v-if="rxMode === 'western'">
               <div v-for="(row, i) in rxRows" :key="i" class="rx-row">
-                <ElAutocomplete
-                  v-model="row.drug"
-                  class="rx-drug"
-                  placeholder="药品名（输入联想）"
-                  :fetch-suggestions="queryDrugs"
-                  @select="(item) => onDrugSelect(item, row)"
-                />
-                <ElInput v-model="row.spec" class="rx-spec" placeholder="规格" />
-                <ElInput v-model="row.dose" class="rx-dose" placeholder="剂量" />
-                <ElSelect v-model="row.frequency" class="rx-freq" placeholder="频次" clearable>
-                  <ElOption v-for="f in FREQ_OPTIONS" :key="f.value" :label="f.label" :value="f.value" />
-                </ElSelect>
-                <ElSelect v-model="row.route" class="rx-route" placeholder="途径" clearable>
-                  <ElOption v-for="r in ROUTE_OPTIONS" :key="r" :label="r" :value="r" />
-                </ElSelect>
-                <ElInput v-model="row.duration" class="rx-dur" placeholder="疗程(如7天)" />
+                <FloatField label="药品名" :value="row.drug">
+                  <ElAutocomplete
+                    v-model="row.drug"
+                    class="rx-drug"
+                    :fetch-suggestions="queryDrugs"
+                    @select="(item) => onDrugSelect(item, row)"
+                  />
+                </FloatField>
+                <FloatField label="规格" :value="row.spec">
+                  <ElInput v-model="row.spec" class="rx-spec" />
+                </FloatField>
+                <FloatField label="剂量" :value="row.dose">
+                  <ElInput v-model="row.dose" class="rx-dose" />
+                </FloatField>
+                <FloatField label="频次" :value="row.frequency">
+                  <ElSelect v-model="row.frequency" class="rx-freq" placeholder="" clearable>
+                    <ElOption v-for="f in FREQ_OPTIONS" :key="f.value" :label="f.label" :value="f.value" />
+                  </ElSelect>
+                </FloatField>
+                <FloatField label="途径" :value="row.route">
+                  <ElSelect v-model="row.route" class="rx-route" placeholder="" clearable>
+                    <ElOption v-for="r in ROUTE_OPTIONS" :key="r" :label="r" :value="r" />
+                  </ElSelect>
+                </FloatField>
+                <FloatField label="疗程" :value="row.duration">
+                  <ElInput v-model="row.duration" class="rx-dur" />
+                </FloatField>
                 <button class="btn btn-ghost btn-sm rx-del" @click="removeRxRow(i)">✕</button>
               </div>
               <button class="btn btn-ghost btn-sm" @click="addRxRow">＋ 添加药品</button>
@@ -145,16 +159,15 @@
               </div>
               <div v-for="(row, i) in herbRows" :key="i" class="herb-row">
                 <span class="herb-idx">{{ i + 1 }}</span>
-                <ElAutocomplete
-                  v-model="row.drug"
-                  class="herb-drug"
-                  placeholder="饮片名（输入联想）"
-                  :fetch-suggestions="queryHerbs"
-                />
-                <div class="herb-dose-wrap">
-                  <ElInput v-model="row.dose" class="herb-dose" placeholder="剂量" />
-                  <span class="herb-unit">克</span>
-                </div>
+                <FloatField label="饮片名" :value="row.drug">
+                  <ElAutocomplete v-model="row.drug" class="herb-drug" :fetch-suggestions="queryHerbs" />
+                </FloatField>
+                <FloatField label="剂量" :value="row.dose">
+                  <div class="herb-dose-wrap">
+                    <ElInput v-model="row.dose" class="herb-dose" />
+                    <span class="herb-unit">克</span>
+                  </div>
+                </FloatField>
                 <button class="btn btn-ghost btn-sm rx-del" title="删除该饮片" @click="removeHerbRow(i)">✕</button>
               </div>
               <button class="btn btn-ghost btn-sm" @click="addHerbRow">＋ 添加饮片</button>
@@ -162,20 +175,20 @@
               <div class="herb-usage">
                 <div class="herb-usage-item">
                   <span class="herb-usage-label">煎服法</span>
-                  <ElSelect v-model="herbalUsage.decoction" placeholder="煎服法" clearable>
+                  <ElSelect v-model="herbalUsage.decoction" placeholder="" clearable>
                     <ElOption v-for="d in HERB_DECOCTION_OPTIONS" :key="d" :label="d" :value="d" />
                   </ElSelect>
                 </div>
                 <div class="herb-usage-item herb-usage-wide">
                   <span class="herb-usage-label">服法</span>
-                  <ElSelect v-model="herbalUsage.usage" placeholder="服法" clearable>
+                  <ElSelect v-model="herbalUsage.usage" placeholder="" clearable>
                     <ElOption v-for="u in HERB_USAGE_OPTIONS" :key="u" :label="u" :value="u" />
                   </ElSelect>
                 </div>
                 <div class="herb-usage-item">
                   <span class="herb-usage-label">剂数</span>
                   <div class="herb-dose-wrap">
-                    <ElInput v-model="herbalUsage.doses" placeholder="7" />
+                    <ElInput v-model="herbalUsage.doses" placeholder="" />
                     <span class="herb-unit">剂</span>
                   </div>
                 </div>
@@ -191,7 +204,7 @@
           </div>
         </EmrBlock>
         <EmrBlock v-if="tab === 'exam'" label="检查申请">
-          <AutoTextarea v-model="form.examRequest" placeholder="检查项目与临床指征（CA 签名前必填）" />
+          <AutoTextarea v-model="form.examRequest" />
         </EmrBlock>
 
         <div v-if="errorMsg" class="err">{{ errorMsg }}</div>
@@ -291,6 +304,7 @@ import { buildRecordPrintHtml, type PrintBuildOptions } from '@/utils/print'
 import { emitDataChanged } from '@/utils/events'
 import { useUserStore } from '@/stores/user'
 import PrintPreviewDialog from '@/components/PrintPreviewDialog.vue'
+import FloatField from '@/components/FloatField.vue'
 import Pagination from '@/components/Pagination.vue'
 import AutoTextarea from '@/components/AutoTextarea.vue'
 import { ElMessageBox, ElAutocomplete, ElSelect, ElOption, ElInput } from 'element-plus'
@@ -1040,6 +1054,10 @@ watch(
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.vital-bp .ff {
+  flex: 1;
+  min-width: 0;
 }
 .vital-one {
   display: flex;

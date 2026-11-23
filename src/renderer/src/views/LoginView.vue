@@ -15,14 +15,13 @@
         <h2>欢迎回来 👋</h2>
         <div class="sub">请使用工号登录工作站</div>
         <div class="lb">工号</div>
-        <input v-model="username" class="inp" style="height: 40px" placeholder="工号" @keydown.enter="doLogin" />
+        <input v-model="username" class="inp" style="height: 40px" @keydown.enter="doLogin" />
         <div class="lb">密码</div>
         <input
           v-model="password"
           class="inp"
           type="password"
           style="height: 40px"
-          placeholder="密码"
           @keydown.enter="doLogin"
         />
         <label class="remember-row">

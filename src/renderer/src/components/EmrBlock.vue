@@ -18,6 +18,8 @@ defineProps<{
 
 <style scoped>
 .block {
+  /* 内容区底色为 --card2：浮标缺口沿用同色，避免露出色块 */
+  --ff-bg: var(--card2);
   margin: 14px 20px;
   padding: 15px 17px;
   background: var(--card2);

@@ -44,12 +44,14 @@
               </div>
             </div>
           </div>
+          <div class="pop-item" @click="openChangePassword">🔑 修改密码</div>
           <div class="pop-item" @click="logout">⏻ 退出登录</div>
         </div>
       </div>
     </div>
   </header>
   <CommandPalette v-model="paletteOpen" />
+  <ChangePasswordDialog v-model:visible="pwdOpen" @done="onPasswordChanged" />
 </template>
 
 <script setup lang="ts">
@@ -59,7 +61,11 @@ import { onClickOutside } from '@vueuse/core'
 import { useUserStore } from '@/stores/user'
 import { useTodoStore } from '@/stores/todo'
 import { onDataChanged } from '@/utils/events'
+import { ElMessage } from 'element-plus'
+import 'element-plus/es/components/message/style/css'
 import CommandPalette from '@/components/CommandPalette.vue'
+import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue'
+import { logout as apiLogout } from '@/api/auth'
 
 const userStore = useUserStore()
 const todoStore = useTodoStore()
@@ -94,8 +100,29 @@ function goTodo(kind: string): void {
   else router.push('/inpatient')
 }
 
-function logout(): void {
+const pwdOpen = ref(false)
+
+function openChangePassword(): void {
   userMenuOpen.value = false
+  pwdOpen.value = true
+}
+
+async function onPasswordChanged(): Promise<void> {
+  pwdOpen.value = false
+  // 改密后服务端吊销全部会话，必须重新登录
+  userStore.logout()
+  router.push('/login')
+  ElMessage.success('密码已修改，请使用新密码重新登录')
+}
+
+async function logout(): Promise<void> {
+  userMenuOpen.value = false
+  try {
+    // 吊销服务端会话（失败不阻断本地登出）
+    await apiLogout()
+  } catch {
+    // 忽略：token 已失效时登出接口也会失败
+  }
   userStore.logout()
   router.push('/login')
 }

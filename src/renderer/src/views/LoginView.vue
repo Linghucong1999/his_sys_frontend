@@ -49,13 +49,17 @@
         </div>
       </div>
     </div>
+    <ChangePasswordDialog v-model:visible="forcePwdOpen" force @done="onForcedPasswordChanged" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import 'element-plus/es/components/message/style/css'
 import { useUserStore } from '@/stores/user'
+import ChangePasswordDialog from '@/components/ChangePasswordDialog.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -95,6 +99,9 @@ const greeting = computed(() => {
   return '晚上好'
 })
 
+/** 强制改密对话框（管理员重置 / 初始密码） */
+const forcePwdOpen = ref(false)
+
 async function doLogin(): Promise<void> {
   if (!username.value || !password.value) {
     errorMsg.value = '请输入工号和密码'
@@ -110,12 +117,24 @@ async function doLogin(): Promise<void> {
     } else {
       await window.api.clearCredentials().catch(() => undefined)
     }
+    if (userStore.user?.mustChangePassword) {
+      // 管理员重置或初始密码：必须先改密，改完用新密码重新登录
+      forcePwdOpen.value = true
+      return
+    }
     router.push('/workbench')
   } catch (e) {
     errorMsg.value = (e as Error).message
   } finally {
     loading.value = false
   }
+}
+
+function onForcedPasswordChanged(): void {
+  forcePwdOpen.value = false
+  userStore.logout()
+  errorMsg.value = ''
+  ElMessage.success('密码已修改，请使用新密码登录')
 }
 </script>
 

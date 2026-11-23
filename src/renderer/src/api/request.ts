@@ -35,8 +35,13 @@ instance.interceptors.response.use(
       localStorage.removeItem('his_token')
       localStorage.removeItem('his_user')
     }
-    const message = error.response?.data?.message ?? error.message ?? '网络错误'
-    return Promise.reject(new Error(message))
+    const body = error.response?.data
+    const message = body?.message ?? error.message ?? '网络错误'
+    // 附带状态码与业务负载（例如 409 冲突里的 rev / updatedBy / updatedAt）
+    const wrapped = new Error(message) as Error & { status?: number; payload?: unknown }
+    wrapped.status = error.response?.status
+    wrapped.payload = body?.data ?? body
+    return Promise.reject(wrapped)
   }
 )
 
@@ -50,6 +55,9 @@ const request = {
   },
   put<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
     return instance.put(url, data, config) as unknown as Promise<T>
+  },
+  patch<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<T> {
+    return instance.patch(url, data, config) as unknown as Promise<T>
   }
 }
 

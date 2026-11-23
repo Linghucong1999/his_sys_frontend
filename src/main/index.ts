@@ -1,5 +1,5 @@
 import { app, shell, BrowserWindow, ipcMain, safeStorage, Tray, Menu, nativeImage } from 'electron'
-import type { Size, NativeImage } from 'electron'
+import type { Size, NativeImage, WebContents } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 
@@ -164,15 +164,38 @@ interface PrintHtmlPayload {
   pagesPerSheet?: number
 }
 
+/** 从指定 webContents 枚举系统打印机 */
+async function collectPrinters(
+  wc: WebContents
+): Promise<Array<{ name: string; displayName: string; status: number; isDefault: boolean }>> {
+  const list = await wc.getPrintersAsync()
+  return list.map((p) => ({
+    name: p.name,
+    displayName: p.displayName,
+    status: (p as unknown as { status?: number }).status ?? 0,
+    isDefault: (p as unknown as { isDefault?: boolean }).isDefault ?? false
+  }))
+}
+
 function registerPrintHandler(): void {
   // 系统打印机列表（渲染进程预览对话框下拉选择用）
   ipcMain.handle('print:list-printers', async () => {
-    return (await getPrintWindow().webContents.getPrintersAsync()).map((p) => ({
-      name: p.name,
-      displayName: p.displayName,
-      status: (p as unknown as { status?: number }).status ?? 0,
-      isDefault: (p as unknown as { isDefault?: boolean }).isDefault ?? false
-    }))
+    const win = getPrintWindow()
+    // 隐藏窗口首次使用时渲染进程尚未就绪，直接枚举会得到空列表：先加载空白页
+    if (!win.webContents.getURL()) {
+      await win.loadURL('about:blank')
+    }
+    try {
+      const list = await collectPrinters(win.webContents)
+      if (list.length > 0) return list
+    } catch (e) {
+      console.warn('隐藏打印窗口枚举打印机失败，回退主窗口:', (e as Error).message)
+    }
+    // 兜底：隐藏窗口异常时用主窗口枚举，避免对话框显示"未检测到打印机"
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      return collectPrinters(mainWindow.webContents)
+    }
+    return []
   })
 
   ipcMain.handle(
@@ -212,8 +235,11 @@ function registerPrintHandler(): void {
                   : ((payload.pageSize as 'A4' | 'A5' | 'Letter' | 'Legal') || 'A4')
             },
             (success, failureReason) => {
-              if (!success && failureReason) {
-                console.warn('打印失败:', failureReason)
+              // 失败一律留痕（含目标打印机），便于排查；成功仅表示任务已交给后台打印程序
+              if (!success) {
+                console.warn(
+                  `打印失败：[${payload.deviceName ?? '系统默认打印机'}] ${failureReason || '未知原因'}`
+                )
               }
               if (!payload.silent) {
                 win.hide()

@@ -49,10 +49,16 @@
         <!-- 右侧：打印设置 -->
         <div class="preview-ops">
           <div class="ops-sec">
-            <div class="ops-label">打印机</div>
+            <div class="ops-label">
+              打印机
+              <button class="ops-refresh" :disabled="loadingPrinters" title="重新检测打印机" @click="loadPrinters">
+                ↻
+              </button>
+            </div>
             <ElSelect v-model="selectedPrinter" class="his-ep-select" placeholder="未检测到打印机" clearable>
               <ElOption v-for="p in printerOptions" :key="p.value" :label="p.label" :value="p.value" />
             </ElSelect>
+            <div v-if="printerTip" class="ops-note" :class="{ err: printerFailed }">{{ printerTip }}</div>
           </div>
 
           <div class="ops-sec">
@@ -139,6 +145,7 @@
           </div>
 
           <div v-if="errorMsg" class="err">{{ errorMsg }}</div>
+          <div v-if="submittedTip" class="ok">{{ submittedTip }}</div>
         </div>
       </div>
       <div class="preview-ft">
@@ -185,8 +192,16 @@ const copies = ref(1)
 const printing = ref(false)
 const errorMsg = ref('')
 
-const printers = ref<Array<{ name: string; displayName: string; isDefault: boolean }>>([])
+const printers = ref<Array<{ name: string; displayName: string; status: number; isDefault: boolean }>>([])
 const selectedPrinter = ref('')
+const loadingPrinters = ref(false)
+/** 打印机枚举失败 / 系统无打印机时的提示（不再静默显示"未检测到打印机"） */
+const printerTip = ref('')
+const printerFailed = ref(false)
+/** 任务已提交后的提示（Electron 只能确认"已交给后台打印程序"，不能确认出纸） */
+const submittedTip = ref('')
+/** 打印提交超时：驱动长时间不回调时释放界面，避免永久停在"打印中…" */
+const PRINT_TIMEOUT_MS = 45000
 
 /** 打印设置 */
 const pageSize = ref<PrintPageSize>('A4')
@@ -337,83 +352,176 @@ const rangeText = computed(
   () => parsedRanges.value?.map((r) => (r.from === r.to ? `${r.from}` : `${r.from}-${r.to}`)).join('、') ?? ''
 )
 
+/** Windows 打印机状态位（128=离线、1=暂停…）：命中即表示任务不会出纸，需在提交前拦截 */
+const PRINTER_STATUS_BITS: Array<[number, string]> = [
+  [0x00000001, '已暂停'],
+  [0x00000002, '错误'],
+  [0x00000008, '卡纸'],
+  [0x00000010, '缺纸'],
+  [0x00000020, '缺纸'],
+  [0x00000080, '离线'],
+  [0x00000400, '碳粉不足'],
+  [0x00001000, '不可用'],
+  [0x00100000, '门未关']
+]
+
+function printerStatusLabel(status: number): string {
+  const hit = PRINTER_STATUS_BITS.find(([bit]) => (status & bit) !== 0)
+  return hit ? hit[1] : ''
+}
+
 const printerOptions = computed(() =>
-  printers.value.map((p) => ({
-    value: p.name,
-    label: `${p.displayName}${p.isDefault ? '（默认）' : ''}`
-  }))
+  printers.value.map((p) => {
+    const bad = printerStatusLabel(p.status)
+    return {
+      value: p.name,
+      label: `${p.displayName}${p.isDefault ? '（默认）' : ''}${bad ? `（${bad}）` : ''}`
+    }
+  })
 )
 
 async function loadPrinters(): Promise<void> {
+  loadingPrinters.value = true
+  printerTip.value = ''
+  printerFailed.value = false
   try {
-    printers.value = await window.api.listPrinters()
-    const def = printers.value.find((p) => p.isDefault) ?? printers.value[0]
-    selectedPrinter.value = def?.name ?? ''
-  } catch {
+    if (typeof window.api?.listPrinters !== 'function') {
+      printers.value = []
+      printerFailed.value = true
+      printerTip.value = '打印服务未就绪（预加载脚本版本过旧），请重启应用后重试'
+      return
+    }
+    const list = await window.api.listPrinters()
+    printers.value = list
+    if (list.length === 0) {
+      printers.value = []
+      selectedPrinter.value = ''
+      printerFailed.value = true
+      printerTip.value = '系统未检测到可用打印机，请先在系统中安装或启用打印机'
+      return
+    }
+    // 保留用户上次选择；该打印机已不存在时才回落到默认打印机
+    if (!list.some((p) => p.name === selectedPrinter.value)) {
+      const def = list.find((p) => p.isDefault) ?? list[0]
+      selectedPrinter.value = def?.name ?? ''
+    }
+  } catch (e) {
     printers.value = []
+    printerFailed.value = true
+    printerTip.value = `打印机读取失败：${(e as Error).message || '未知错误'}`
+  } finally {
+    loadingPrinters.value = false
   }
 }
 
 function close(): void {
   emit('update:visible', false)
   errorMsg.value = ''
+  submittedTip.value = ''
 }
 
 /** 打印（静默输出到所选打印机，页码范围/方向/灰度/份数按当前设置） */
 async function doPrint(): Promise<void> {
-  if (!html.value) return
+  if (!html.value) {
+    errorMsg.value = '打印内容为空，无法打印，请关闭后重新打开打印预览'
+    return
+  }
   if (rangeMode.value === 'custom' && !parsedRanges.value) {
     errorMsg.value = '页码范围格式无效，请填写如 1-2 或 1,3'
     return
   }
+  // 提交前拦截：离线/暂停/缺纸等状态下，后台打印程序会接收任务但不会出纸
+  const target = printers.value.find((p) => p.name === selectedPrinter.value)
+  const unavailable = target ? printerStatusLabel(target.status) : ''
+  if (target && unavailable) {
+    errorMsg.value = `所选打印机「${target.displayName}」当前${unavailable}，任务会滞留在队列中。请先恢复打印机，或改选其他打印机。`
+    return
+  }
   printing.value = true
   errorMsg.value = ''
+  submittedTip.value = ''
+  let timer: ReturnType<typeof setTimeout> | undefined
   try {
-    const result = await window.api.printHtml(html.value, {
-      silent: true,
-      copies: copies.value,
-      collate: true,
-      deviceName: selectedPrinter.value || undefined,
-      pageSize: pageSize.value,
-      landscape: landscape.value,
-      color: !grayscale.value,
-      pageRanges: parsedRanges.value
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`打印超时：驱动 ${PRINT_TIMEOUT_MS / 1000} 秒未响应，任务可能仍滞留在队列中`)),
+        PRINT_TIMEOUT_MS
+      )
     })
+    const result = await Promise.race([
+      window.api.printHtml(html.value, {
+        silent: true,
+        copies: copies.value,
+        collate: true,
+        deviceName: selectedPrinter.value || undefined,
+        pageSize: pageSize.value,
+        landscape: landscape.value,
+        color: !grayscale.value,
+        pageRanges: parsedRanges.value
+      }),
+      timeout
+    ])
     if (!result.ok) {
-      errorMsg.value = `打印失败${result.reason ? '：' + result.reason : ''}`
+      errorMsg.value = `打印失败：${result.reason || '打印机未响应，请检查设备状态与打印队列'}`
       return
     }
+    // success 仅代表任务已交给后台打印程序，不代表已出纸：保留对话框并明确告知
+    submittedTip.value = `已提交到「${target?.displayName ?? '系统默认打印机'}」${copies.value} 份，请到打印机确认出纸（若设备离线/暂停，任务会滞留在队列中）`
     emit('printed')
-    close()
   } catch (e) {
     errorMsg.value = (e as Error).message
   } finally {
+    if (timer) clearTimeout(timer)
     printing.value = false
   }
 }
 
 /** 调起 Windows 系统打印对话框（页面范围/缩放/方向等交给驱动程序处理） */
 async function openSystemPrint(): Promise<void> {
-  if (!html.value) return
+  if (!html.value) {
+    errorMsg.value = '打印内容为空，无法调起系统打印对话框，请关闭后重新打开打印预览'
+    return
+  }
   printing.value = true
   errorMsg.value = ''
+  let timer: ReturnType<typeof setTimeout> | undefined
   try {
-    await window.api.printHtml(html.value, {
-      silent: false,
-      deviceName: selectedPrinter.value || undefined,
-      pageSize: pageSize.value,
-      landscape: landscape.value,
-      color: !grayscale.value
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`系统打印对话框 ${PRINT_TIMEOUT_MS / 1000} 秒未响应，请检查打印窗口是否被遮挡`)),
+        PRINT_TIMEOUT_MS
+      )
     })
+    const result = await Promise.race([
+      window.api.printHtml(html.value, {
+        silent: false,
+        deviceName: selectedPrinter.value || undefined,
+        pageSize: pageSize.value,
+        landscape: landscape.value,
+        color: !grayscale.value
+      }),
+      timeout
+    ])
+    if (result && !result.ok) {
+      errorMsg.value = `系统打印未完成：${result.reason || '已取消或打印机未响应'}`
+    }
   } catch (e) {
     errorMsg.value = (e as Error).message
   } finally {
+    if (timer) clearTimeout(timer)
     printing.value = false
   }
 }
 
+watch(
+  () => props.visible,
+  (v) => {
+    if (v) void loadPrinters()
+  }
+)
+
 onMounted(() => {
-  void loadPrinters()
+  if (props.visible) void loadPrinters()
 })
 </script>
 
@@ -585,6 +693,23 @@ onMounted(() => {
   color: var(--text-mute);
   margin-bottom: 7px;
 }
+.ops-refresh {
+  float: right;
+  padding: 0 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-mute);
+  font-size: 12.5px;
+  line-height: 1;
+  cursor: pointer;
+}
+.ops-refresh:hover:not(:disabled) {
+  opacity: 0.6;
+}
+.ops-refresh:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
 .ops-row {
   display: flex;
   align-items: center;
@@ -715,6 +840,13 @@ onMounted(() => {
   font-size: 12px;
   color: var(--red);
   background: var(--red-bg);
+  padding: 8px 10px;
+  border-radius: 9px;
+}
+.ok {
+  font-size: 12px;
+  color: var(--green);
+  background: var(--green-bg);
   padding: 8px 10px;
   border-radius: 9px;
 }

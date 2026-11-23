@@ -11,10 +11,24 @@ export interface SaveRecordInput {
   presentIllness?: string
   pastHistory?: string
   physicalExam?: string
+  vitals?: {
+    bpHigh?: string
+    bpLow?: string
+    breath?: string
+    temp?: string
+    pulse?: string
+  }
   diagnosis?: DiagnosisItem[]
   prescriptionSummary?: string
   prescriptionItems?: RxItem[]
+  /** 处方类型：western=西药/中成药；herbal=中药饮片 */
+  prescriptionType?: 'western' | 'herbal'
+  herbalUsage?: { decoction?: string; usage?: string; doses?: string }
   examRequest?: string
+  /** 乐观锁版本号：来自当前编辑中的记录 */
+  rev?: number
+  /** 冲突后强制覆盖（后端会写审计） */
+  force?: boolean
 }
 
 export function listRecords(params?: {
@@ -23,6 +37,14 @@ export function listRecords(params?: {
   type?: string
 }): Promise<MedicalRecord[]> {
   return request.get('/emr/records', { params })
+}
+
+/**
+ * 患者维度病历：跨医生可见「已签名」记录（只读），未签名草稿只有本人可见。
+ * 复诊调档必须走这个接口，否则看不到前一位医师书写的历史病历。
+ */
+export function listRecordsByPatient(patientId: string): Promise<MedicalRecord[]> {
+  return request.get(`/emr/records/patient/${patientId}`)
 }
 
 export interface RecordPageQuery {

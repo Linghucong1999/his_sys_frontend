@@ -40,6 +40,8 @@ export function createVisit(data: {
   patientName: string
   type: 'first' | 'followup'
   chiefComplaint?: string
+  /** 调档原因：复诊/转诊/会诊/急诊（跨医生调阅病历的合法性依据，写审计） */
+  accessReason?: string
 }): Promise<Visit> {
   return request.post('/outpatient/visits', data)
 }

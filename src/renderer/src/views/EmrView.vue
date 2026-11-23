@@ -139,7 +139,7 @@
         <div class="prev-ft">
           <button class="btn btn-ghost" :disabled="busy || !selected" @click="onPrint">🖨 打印</button>
           <button class="btn btn-ghost">复制为新病历模板</button>
-          <button v-if="selected && !selected.signed && canSign" class="btn btn-primary" :disabled="busy" @click="onSign">🔏 CA 签名</button>
+          <button v-if="selected && !selected.signed && canSign && canDo('emr.sign')" class="btn btn-primary" :disabled="busy" @click="onSign">🔏 CA 签名</button>
           <button v-else-if="selected && !selected.signed && !canSign" class="btn btn-warn" @click="goFix">
             ⚠ 缺{{ signMissing.join('、') }} · 去补充
           </button>
@@ -162,8 +162,9 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useWindowSize } from '@vueuse/core'
 import { fetchRecordPage, signRecord } from '@/api/emr'
+import { can, type Action } from '@/utils/permission'
 import { fetchPatient } from '@/api/patients'
-import { buildRecordPrintHtml, type PrintBuildOptions } from '@/utils/print'
+import { buildRecordPrintHtml, withCurrentIssuer, type PrintBuildOptions } from '@/utils/print'
 import { emitDataChanged } from '@/utils/events'
 import { useUserStore } from '@/stores/user'
 import PrintPreviewDialog from '@/components/PrintPreviewDialog.vue'
@@ -181,6 +182,8 @@ function alertError(msg: string, title = '操作失败'): void {
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+/** 入口可见性：非医生角色不出现 CA 签名入口（鉴权仍以后端为准） */
+const canDo = (action: Action): boolean => can(userStore.user, action)
 const { height: windowHeight } = useWindowSize()
 
 const records = ref<MedicalRecord[]>([])
@@ -409,7 +412,12 @@ const previewPatient = ref<Patient | null>(null)
 /** 按纸张/方向/缩放重建打印稿（预览对话框切换设置时实时更新） */
 function buildPreviewHtml(options: PrintBuildOptions): string {
   if (!selected.value) return previewHtml.value
-  return buildRecordPrintHtml(selected.value, previewPatient.value, userStore.user?.department, options)
+  return buildRecordPrintHtml(
+    withCurrentIssuer(selected.value, { realName: userStore.user?.realName, username: userStore.user?.username }),
+    previewPatient.value,
+    userStore.user?.department,
+    options
+  )
 }
 
 async function onPrint(): Promise<void> {
@@ -418,9 +426,12 @@ async function onPrint(): Promise<void> {
   try {
     const patient = await fetchPatient(selected.value.patientId)
     previewPatient.value = patient
-    previewHtml.value = buildRecordPrintHtml(selected.value, patient, userStore.user?.department, {
-      pageSize: 'A4'
-    })
+    previewHtml.value = buildRecordPrintHtml(
+      withCurrentIssuer(selected.value, { realName: userStore.user?.realName, username: userStore.user?.username }),
+      patient,
+      userStore.user?.department,
+      { pageSize: 'A4' }
+    )
     previewTitle.value = `${typeLabel(activeTab.value)} · ${selected.value.patientName}`
     previewVisible.value = true
   } catch (e) {

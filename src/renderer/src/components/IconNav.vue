@@ -18,14 +18,17 @@
         {{ isDark ? '☀️' : '🌙' }}
         <span class="tip">{{ isDark ? '切换浅色模式' : '切换深色模式' }}</span>
       </div>
-      <div class="inav" title="系统设置（建设中）">⚙️<span class="tip">系统设置</span></div>
+
     </div>
   </nav>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useDark, useToggle } from '@vueuse/core'
+import { visibleNavs } from '@/config/nav'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
@@ -38,14 +41,9 @@ const isDark = useDark({
 })
 const toggleDark = useToggle(isDark)
 
-const navs = [
-  { view: 'workbench', icon: '🏠', tip: '智能工作台' },
-  { view: 'p360', icon: '🩺', tip: '患者 360° 工作站' },
-  { view: 'inpatient', icon: '🛏', tip: '住院工作站' },
-  { view: 'emr', icon: '📋', tip: '电子病历 EMR' },
-  { view: 'consultations', icon: '🤝', tip: '会诊管理' },
-  { view: 'drugs', icon: '💊', tip: '药品说明书' }
-]
+const userStore = useUserStore()
+/** 菜单按角色裁剪：护士/药师看不到与己无关的模块 */
+const navs = computed(() => visibleNavs(userStore.user?.roles ?? []))
 
 function go(view: string): void {
   router.push('/' + view)

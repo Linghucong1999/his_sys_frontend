@@ -148,7 +148,7 @@
                 </FloatField>
                 <button class="btn btn-ghost btn-sm rx-del" @click="removeRxRow(i)">✕</button>
               </div>
-              <button class="btn btn-ghost btn-sm" @click="addRxRow">＋ 添加药品</button>
+              <button v-if="canDo('emr.write')" class="btn btn-ghost btn-sm" @click="addRxRow">＋ 添加药品</button>
             </template>
 
             <!-- 中药处方：饮片明细 + 统一用法 -->
@@ -170,7 +170,7 @@
                 </FloatField>
                 <button class="btn btn-ghost btn-sm rx-del" title="删除该饮片" @click="removeHerbRow(i)">✕</button>
               </div>
-              <button class="btn btn-ghost btn-sm" @click="addHerbRow">＋ 添加饮片</button>
+              <button v-if="canDo('emr.write')" class="btn btn-ghost btn-sm" @click="addHerbRow">＋ 添加饮片</button>
 
               <div class="herb-usage">
                 <div class="herb-usage-item">
@@ -211,8 +211,8 @@
         <div class="editor-ft">
           <button class="btn btn-ghost">存为模板</button>
           <button class="btn btn-ghost" @click="onPrint">打印</button>
-          <button class="btn btn-ghost" :disabled="busy" @click="onSave">保存</button>
-          <button class="btn btn-primary" :disabled="busy || signed" @click="onSign">
+          <button v-if="canDo('emr.write')" class="btn btn-ghost" :disabled="busy" @click="onSave">保存</button>
+          <button v-if="canDo('emr.sign')" class="btn btn-primary" :disabled="busy || signed" @click="onSign">
             {{ signed ? '已 CA 签名' : '🔏 CA 签名并完成接诊' }}
           </button>
         </div>
@@ -230,6 +230,44 @@
         ]"
         :tips="['头孢呋辛与当前诊断匹配，无相互作用风险。']"
       />
+    </div>
+    <RecordTimeline
+      v-if="historyRecords.length"
+      :records="historyRecords"
+      :current-user-id="userStore.user?.userId"
+      @select="onHistorySelect"
+    />
+    <div v-if="historyDetail" class="hist-mask" @click.self="historyDetail = null">
+      <div class="hist-panel">
+        <div class="hist-hd">
+          <b>{{ historyDetail.patientName }} · {{ HIST_TYPE_LABEL[historyDetail.type] ?? historyDetail.type }}</b>
+          <span class="tag" :class="historyDetail.signed ? 'tag-green' : 'tag-orange'">
+            {{ historyDetail.signed ? `🔏 ${historyDetail.signedBy ?? '已签名'}` : '草稿' }}
+          </span>
+          <button class="icon-btn" @click="historyDetail = null">✕</button>
+        </div>
+        <div class="hist-meta">
+          {{ fmtHistDate(historyDetail.visitedAt) }} · {{ historyDetail.doctorName }} ·
+          {{ historyDetail.department }}
+        </div>
+        <div class="hist-body">
+          <p v-if="historyDetail.chiefComplaint"><b>主诉</b>：{{ historyDetail.chiefComplaint }}</p>
+          <p v-if="historyDetail.presentIllness"><b>现病史</b>：{{ historyDetail.presentIllness }}</p>
+          <p v-if="historyDetail.pastHistory"><b>既往史</b>：{{ historyDetail.pastHistory }}</p>
+          <p v-if="historyDetail.physicalExam"><b>体格检查</b>：{{ historyDetail.physicalExam }}</p>
+          <p v-if="historyDetail.diagnosis?.length">
+            <b>诊断</b>：{{ historyDetail.diagnosis.map((d) => `${d.code} ${d.name}`).join('；') }}
+          </p>
+          <p v-if="historyDetail.prescriptionSummary">
+            <b>处方摘要</b>：{{ historyDetail.prescriptionSummary }}
+          </p>
+          <p v-if="historyDetail.examRequest"><b>检查申请</b>：{{ historyDetail.examRequest }}</p>
+        </div>
+        <div class="hist-ft">
+          <span class="hist-tip">历史文书只读；如需复诊续方，请在左侧新建本次病历</span>
+          <button class="btn btn-ghost" @click="historyDetail = null">关闭</button>
+        </div>
+      </div>
     </div>
   </section>
   <section v-else class="list-view">
@@ -292,22 +330,25 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePatientStore, TAB_OF_PENDING } from '@/stores/patient'
-import { listRecords, saveRecord, signRecord } from '@/api/emr'
+import { listRecordsByPatient, saveRecord, signRecord } from '@/api/emr'
+import { can, type Action } from '@/utils/permission'
 import { listDictionaries } from '@/api/misc'
 import { fetchPatientPage } from '@/api/patients'
 import PatientJourney from '@/components/PatientJourney.vue'
+import RecordTimeline from '@/components/RecordTimeline.vue'
 import type { JourneyNode } from '@/components/PatientJourney.vue'
 import EmrBlock from '@/components/EmrBlock.vue'
 import AiCopilotPanel from '@/components/AiCopilotPanel.vue'
 import type { DiagnosisItem, MedicalRecord, RxItem, Patient, HerbalUsage } from '@/api/types'
-import { buildRecordPrintHtml, type PrintBuildOptions } from '@/utils/print'
+import { buildRecordPrintHtml, withCurrentIssuer, type PrintBuildOptions } from '@/utils/print'
 import { emitDataChanged } from '@/utils/events'
 import { useUserStore } from '@/stores/user'
 import PrintPreviewDialog from '@/components/PrintPreviewDialog.vue'
 import FloatField from '@/components/FloatField.vue'
 import Pagination from '@/components/Pagination.vue'
 import AutoTextarea from '@/components/AutoTextarea.vue'
-import { ElMessageBox, ElAutocomplete, ElSelect, ElOption, ElInput } from 'element-plus'
+import { ElMessage, ElMessageBox, ElAutocomplete, ElSelect, ElOption, ElInput } from 'element-plus'
+import 'element-plus/es/components/message/style/css'
 import 'element-plus/es/components/message-box/style/css'
 import 'element-plus/es/components/autocomplete/style/css'
 import 'element-plus/es/components/select/style/css'
@@ -322,6 +363,29 @@ function alertError(msg: string, title = '操作失败'): void {
 const router = useRouter()
 const patientStore = usePatientStore()
 const userStore = useUserStore()
+/** 入口可见性（鉴权仍以后端为准）：护士/药师看不到开方与签名入口 */
+const canDo = (action: Action): boolean => can(userStore.user, action)
+
+/** 既往病历时间轴数据（患者维度：含其他医师书写的已签名文书） */
+const historyRecords = ref<MedicalRecord[]>([])
+const historyDetail = ref<MedicalRecord | null>(null)
+const HIST_TYPE_LABEL: Record<string, string> = {
+  outpatient: '门诊病历',
+  prescription: '处方笺',
+  admission: '入院记录',
+  exam: '检查申请'
+}
+
+function onHistorySelect(record: MedicalRecord): void {
+  historyDetail.value = record
+}
+
+function fmtHistDate(v?: string): string {
+  if (!v) return '—'
+  const d = new Date(v)
+  const p = (n: number): string => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`
+}
 
 const tab = ref<'record' | 'prescription' | 'exam'>('record')
 const savedTip = ref('')
@@ -626,7 +690,11 @@ async function loadIcd(): Promise<void> {
 
 async function loadRecord(): Promise<void> {
   if (!patient.value) return
-  const records = await listRecords({ keyword: patient.value.name })
+  // 患者维度：跨医生可见历史已签名病历（复诊调档依赖），未签名草稿仍是本人的
+  const records = await listRecordsByPatient(patient.value._id)
+  historyRecords.value = [...records].sort(
+    (a, b) => new Date(b.visitedAt ?? b.createdAt ?? 0).getTime() - new Date(a.visitedAt ?? a.createdAt ?? 0).getTime()
+  )
   const unsorted = records.filter((r) => r.type === 'outpatient')
   const sorted = [...unsorted].sort(
     (a, b) => new Date(b.createdAt ?? b.visitedAt ?? 0).getTime() - new Date(a.createdAt ?? a.visitedAt ?? 0).getTime()
@@ -765,17 +833,72 @@ async function onSave(): Promise<void> {
       examRequest: form.value.examRequest
     }
     if (currentRecord.value && !currentRecord.value.signed) {
-      // 编辑已存在的未签名档案：更新而非新建（修复重复建档）
+      // 编辑已存在的未签名档案：带上乐观锁版本号，冲突时提示处理
       const { updateRecord } = await import('@/api/emr')
-      currentRecord.value = await updateRecord(currentRecord.value._id, payload)
+      currentRecord.value = await updateRecord(currentRecord.value._id, {
+        ...payload,
+        rev: currentRecord.value.rev
+      })
     } else {
       currentRecord.value = await saveRecord(payload)
     }
     savedTip.value = `已自动保存 ${new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
   } catch (e) {
-    errorMsg.value = (e as Error).message
+    // 409：并发冲突——展示是谁在何时改过，并允许强制覆盖（后端强制写审计）
+    const err = e as Error & { status?: number; payload?: { rev?: number; updatedBy?: string; updatedAt?: string } }
+    if (err.status === 409 && currentRecord.value) {
+      await handleSaveConflict(err.payload ?? {})
+      return
+    }
+    errorMsg.value = err.message
   } finally {
     busy.value = false
+  }
+}
+
+/** 病历并发冲突：重新加载最新 / 以我的版本强制覆盖 */
+async function handleSaveConflict(info: { rev?: number; updatedBy?: string; updatedAt?: string }): Promise<void> {
+  const when = info.updatedAt ? new Date(info.updatedAt).toLocaleString('zh-CN') : '刚刚'
+  const by = info.updatedBy ?? '其他医师'
+  try {
+    await ElMessageBox.confirm(
+      `这份病历已被「${by}」于 ${when} 修改过。
+
+以我的版本覆盖会以当前内容为准（系统会记录覆盖审计）；重新加载最新则丢弃本地未保存的修改。`,
+      '病历并发冲突',
+      {
+        confirmButtonText: '以我的版本覆盖',
+        cancelButtonText: '重新加载最新',
+        distinguishCancelAndClose: true,
+        type: 'warning'
+      }
+    )
+    const { updateRecord } = await import('@/api/emr')
+    currentRecord.value = await updateRecord(currentRecord.value!._id, {
+      patientId: patient.value!._id,
+      patientName: patient.value!.name,
+      type: 'outpatient',
+      department: currentDepartment.value,
+      chiefComplaint: form.value.chiefComplaint,
+      presentIllness: form.value.presentIllness,
+      pastHistory: form.value.pastHistory,
+      physicalExam: mergedPhysicalExam(),
+      vitals: pureVitals(),
+      diagnosis: parseDiagnosis(form.value.diagnosisText),
+      prescriptionSummary: buildSummaryWithHistory(),
+      prescriptionItems: activeRxItems.value,
+      prescriptionType: rxMode.value,
+      herbalUsage: rxMode.value === 'herbal' ? herbalUsage.value : undefined,
+      examRequest: form.value.examRequest,
+      rev: info.rev,
+      force: true
+    })
+    savedTip.value = '已强制覆盖并保存（已记录覆盖审计）'
+  } catch (action) {
+    if (action === 'cancel') {
+      await loadRecord()
+      ElMessage.info('已加载最新版本，请确认内容后重新编辑保存')
+    }
   }
 }
 
@@ -851,7 +974,12 @@ function buildPreviewHtml(options: PrintBuildOptions): string {
       prescriptionSummary: activeRxSummary.value
     }
     previewTitle.value = `${rxMode.value === 'herbal' ? '中药处方笺' : '处方笺'} · ${patient.value.name}`
-    return buildRecordPrintHtml(draft, patient.value, userStore.user?.department, options)
+    return buildRecordPrintHtml(
+      withCurrentIssuer(draft, { realName: userStore.user?.realName, username: userStore.user?.username }),
+      patient.value,
+      userStore.user?.department,
+      options
+    )
   }
   if (tab.value === 'exam') {
     // 检查申请单
@@ -969,6 +1097,70 @@ watch(
 </script>
 
 <style scoped>
+/* 既往病历只读详情 */
+.hist-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 20, 32, 0.42);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 80;
+}
+.hist-panel {
+  width: 720px;
+  max-width: 92vw;
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  box-shadow: var(--shadow-lg);
+  padding: 16px 18px;
+}
+.hist-hd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+.hist-hd .icon-btn {
+  margin-left: auto;
+}
+.hist-meta {
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--text-mute);
+}
+.hist-body {
+  margin-top: 12px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.75;
+}
+.hist-body p {
+  margin: 0 0 6px;
+}
+.hist-body b {
+  color: var(--text-sub);
+  font-weight: 600;
+  margin-right: 4px;
+}
+.hist-ft {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.hist-tip {
+  font-size: 11.5px;
+  color: var(--text-mute);
+  margin-right: auto;
+}
 .p360 {
   display: grid;
   grid-template-columns: 280px 1fr 300px;

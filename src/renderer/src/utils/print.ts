@@ -237,6 +237,25 @@ function resolveZoom(pageSize: PrintPageSize, landscape: boolean, fit: PrintFit)
 }
 
 /**
+ * 处方打印的签发医师：复诊续方时处方由当前医师开具，
+ * 打印件必须署当前医师（历史医师签名只在系统内的历史记录里保留）。
+ */
+export function withCurrentIssuer(
+  record: MedicalRecord,
+  issuer?: { realName?: string; username?: string }
+): MedicalRecord {
+  if (record.type !== 'prescription') return record
+  const name = issuer?.realName?.trim()
+  if (!name) return record
+  return {
+    ...record,
+    doctorName: name,
+    doctorUsername: issuer?.username ?? record.doctorUsername,
+    signedBy: name
+  }
+}
+
+/**
  * 打印文档生成：按业务分流版式
  * - prescription：处方笺（医院模板：费别/处方编号/姓名/病历号/临床诊断/开具日期/住址电话/Rp/签名栏/费用栏）
  * - outpatient/admission：病历

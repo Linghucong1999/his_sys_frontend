@@ -65,7 +65,8 @@ export const usePatientStore = defineStore('patient', {
         patientId: patient._id,
         empiId: patient.empiId,
         patientName: patient.name,
-        type: 'followup'
+        type: 'followup',
+        accessReason: '复诊'
       })
       this.current = patient
       this.targetTab = ''

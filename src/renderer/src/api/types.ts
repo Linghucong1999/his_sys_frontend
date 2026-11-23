@@ -12,6 +12,8 @@ export interface UserInfo {
   roles: string[]
   department?: string
   title?: string
+  /** 需要强制修改密码（管理员重置后为 true） */
+  mustChangePassword?: boolean
 }
 
 export interface Patient {
@@ -52,6 +54,8 @@ export interface MedicalRecord {
   prescriptionSummary?: string
   examRequest?: string
   signed: boolean
+  /** 乐观锁版本号 */
+  rev?: number
   prescriptionItems?: RxItem[]
   /** 处方类型：western=西药/中成药；herbal=中药饮片 */
   prescriptionType?: 'western' | 'herbal'
@@ -80,6 +84,8 @@ export interface Visit {
   department: string
   doctorName: string
   chiefComplaint?: string
+  /** 调档原因（复诊/转诊/会诊/急诊）：跨医生调阅病历的合法性依据 */
+  accessReason?: string
   status: 'in_progress' | 'completed'
   visitedAt: string
 }

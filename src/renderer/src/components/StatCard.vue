@@ -26,7 +26,8 @@ defineProps<{
 
 <style scoped>
 .stat {
-  padding: 18px;
+  /* 底部为贴底的 Sparkline（34px）预留空间，说明文字不会被曲线压住 */
+  padding: 18px 18px 48px;
   position: relative;
   overflow: hidden;
 }

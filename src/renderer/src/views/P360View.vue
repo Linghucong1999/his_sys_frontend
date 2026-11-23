@@ -316,6 +316,13 @@ const errorMsg = ref('')
 
 const currentRecord = ref<MedicalRecord | null>(null)
 
+/** 当前开具医师/科室：复诊调档后必须归属于登录医师，不能沿用历史接诊医生 */
+const currentDoctorName = computed(() => userStore.user?.realName ?? '')
+const currentDoctorUsername = computed(() => userStore.user?.username ?? '')
+const currentDepartment = computed(
+  () => userStore.user?.department || currentRecord.value?.department || ''
+)
+
 /** 生命体征结构化填写（单位固定，医生只填数字） */
 const vitals = reactive({
   bpHigh: '',
@@ -729,7 +736,7 @@ async function onSave(): Promise<void> {
       patientId: patient.value._id,
       patientName: patient.value.name,
       type: 'outpatient' as const,
-      department: '呼吸内科',
+      department: currentDepartment.value,
       visitId: activeVisit?._id,
       chiefComplaint: form.value.chiefComplaint,
       presentIllness: form.value.presentIllness,
@@ -807,11 +814,16 @@ function buildPreviewHtml(options: PrintBuildOptions): string {
     type: 'outpatient',
     patientId: patient.value._id,
     patientName: patient.value.name,
-    department: '呼吸内科',
-    doctorName: '王医生',
+    department: currentDepartment.value,
+    doctorName: currentDoctorName.value,
+    doctorUsername: currentDoctorUsername.value,
     diagnosis,
     signed: signed.value,
-    signedBy: currentRecord.value?.signedBy,
+    // 历史接诊医师签过的名不带入本次开具：重新开具后需由当前医师重新签名
+    signedBy:
+      currentRecord.value?.signed && currentRecord.value.doctorName === currentDoctorName.value
+        ? currentRecord.value.signedBy
+        : undefined,
     signedAt: currentRecord.value?.signedAt
   }
   if (tab.value === 'prescription') {
